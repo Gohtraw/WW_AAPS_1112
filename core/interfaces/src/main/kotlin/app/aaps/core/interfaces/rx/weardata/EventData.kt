@@ -375,6 +375,7 @@ sealed class EventData : Event() {
 
         @Serializable
         data class UserActionEntry(
+            val timeStamp: Long,
             val id: Int,
             val title: String
         ) : EventData()
