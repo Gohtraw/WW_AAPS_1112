@@ -216,7 +216,7 @@ class HistoryBrowseActivity : TranslatedDaggerAppCompatActivity() {
             // rebuild needed
             secondaryGraphs.clear()
             secondaryGraphsLabel.clear()
-            binding.iobGraph.removeAllViews()
+            binding.secondaryGraphs.removeAllViews()
             (1 until numOfGraphs).forEach { i ->
                 val relativeLayout = RelativeLayout(this)
                 relativeLayout.layoutParams = RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
@@ -239,7 +239,7 @@ class HistoryBrowseActivity : TranslatedDaggerAppCompatActivity() {
                 relativeLayout.addView(label)
                 secondaryGraphsLabel.add(label)
 
-                binding.iobGraph.addView(relativeLayout)
+                binding.secondaryGraphs.addView(relativeLayout)
                 secondaryGraphs.add(graph)
             }
         }

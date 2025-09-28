@@ -387,6 +387,8 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+        secondaryGraphs.clear()
+        secondaryGraphsLabel.clear()
     }
 
     override fun onClick(v: View) {
@@ -638,11 +640,11 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
                                     l.setMargins(rh.dpToPx(1), 0, rh.dpToPx(1), 0)
                                 }
                                 it.setPadding(rh.dpToPx(1), it.paddingTop, rh.dpToPx(1), it.paddingBottom)
-                                it.setCompoundDrawablePadding(rh.dpToPx(-4))
+                                it.compoundDrawablePadding = rh.dpToPx(-4)
                                 it.setCompoundDrawablesWithIntrinsicBounds(
                                     null,
-                                    rh.gd(event.firstActionIcon() ?: app.aaps.core.ui.R.drawable.ic_user_options_24dp).also {
-                                        it?.setBounds(rh.dpToPx(20), rh.dpToPx(20), rh.dpToPx(20), rh.dpToPx(20))
+                                    rh.gd(event.firstActionIcon() ?: app.aaps.core.ui.R.drawable.ic_user_options_24dp).also { icon ->
+                                        icon?.setBounds(rh.dpToPx(20), rh.dpToPx(20), rh.dpToPx(20), rh.dpToPx(20))
                                     }, null, null
                                 )
                                 it.text = event.title
@@ -761,8 +763,8 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
             // rebuild needed
             secondaryGraphs.clear()
             secondaryGraphsLabel.clear()
-            binding.graphsLayout.iobGraph.removeAllViews()
-            (1 until numOfGraphs).forEach {
+            binding.graphsLayout.secondaryGraphs.removeAllViews()
+            (1 until numOfGraphs).forEach { _ ->
                 val relativeLayout = RelativeLayout(context)
                 relativeLayout.layoutParams = RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
 
@@ -785,7 +787,7 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
                 relativeLayout.addView(label)
                 secondaryGraphsLabel.add(label)
 
-                binding.graphsLayout.iobGraph.addView(relativeLayout)
+                binding.graphsLayout.secondaryGraphs.addView(relativeLayout)
                 secondaryGraphs.add(graph)
             }
         }
