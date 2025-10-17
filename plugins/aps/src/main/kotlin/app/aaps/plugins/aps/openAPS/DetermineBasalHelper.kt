@@ -1,13 +1,13 @@
 package app.aaps.plugins.aps.openAPS
 
 import android.icu.text.DecimalFormat
+//import app.aaps.plugins.aps.openAPSAutoISF.DetermineBasalAutoISF.Companion.consoleLog
 import app.aaps.core.interfaces.aps.CurrentTemp
 import app.aaps.core.interfaces.aps.MealData
 import app.aaps.core.interfaces.aps.OapsProfile
 import app.aaps.core.interfaces.aps.OapsProfileAutoIsf
 import app.aaps.core.interfaces.aps.RT
 import app.aaps.core.interfaces.profile.ProfileUtil
-//import app.aaps.plugins.aps.openAPSAutoISF.DetermineBasalAutoISF.Companion.consoleLog
 import dagger.Reusable
 import javax.inject.Inject
 import kotlin.math.min
@@ -48,12 +48,12 @@ class DetermineBasalHelper @Inject constructor(
     fun convertBg(value: Double): String =
         profileUtil.fromMgdlToStringInUnits(value).replace("-0.0", "0.0")
     /**
-     * Adds reason to rT.reason and consoleLog
+     * Adds reason to rT.reason and consoleLog (eventually)
      */
     fun reason(rT: RT, msg: String) {
         if (rT.reason.toString().isNotEmpty()) rT.reason.append(". ")
         rT.reason.append(msg)
-  //      consoleLog.add(msg)
+        //consoleLog.add(msg) //as I wrote: eventually
     }
     /**
      * Adds reason to rT.reason only

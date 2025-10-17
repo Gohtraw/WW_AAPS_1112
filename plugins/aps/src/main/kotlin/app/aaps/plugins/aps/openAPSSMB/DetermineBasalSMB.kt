@@ -311,7 +311,7 @@ class DetermineBasalSMB @Inject constructor(
             // if carbs * assumedCarbAbsorptionRate > remainingCATimeMin, raise it
             // so <= 90g is assumed to take 3h, and 120g=4h
             remainingCATimeMin = Math.max(remainingCATimeMin, meal_data.mealCOB / assumedCarbAbsorptionRate)
-            val lastCarbAge = ((systemTime - meal_data.lastCarbTime) / 60000.0).roundToInt()
+            val lastCarbAge = (systemTime - meal_data.lastCarbTime).milliseconds.inWholeMinutes
             //console.error(meal_data.lastCarbTime, lastCarbAge);
 
             val fractionCOBAbsorbed = (meal_data.carbs - meal_data.mealCOB) / meal_data.carbs
