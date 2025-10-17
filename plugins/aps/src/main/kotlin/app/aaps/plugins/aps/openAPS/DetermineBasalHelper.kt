@@ -7,7 +7,7 @@ import app.aaps.core.interfaces.aps.OapsProfile
 import app.aaps.core.interfaces.aps.OapsProfileAutoIsf
 import app.aaps.core.interfaces.aps.RT
 import app.aaps.core.interfaces.profile.ProfileUtil
-import app.aaps.plugins.aps.openAPSAutoISF.DetermineBasalAutoISF.Companion.consoleLog
+//import app.aaps.plugins.aps.openAPSAutoISF.DetermineBasalAutoISF.Companion.consoleLog
 import dagger.Reusable
 import javax.inject.Inject
 import kotlin.math.min
@@ -31,7 +31,7 @@ class DetermineBasalHelper @Inject constructor(
     /**
      * Returns string representation of double value with two decimal places without trailing zeroes
      */
-    fun Double.withoutZeros(): String = DecimalFormat("0.##").format(this)
+//    fun Double.withoutZeros(): String = DecimalFormat("0.##").format(this)
     fun withoutZeros(value: Double): String {
         return DecimalFormat("0.##").format(value)
     }
@@ -53,7 +53,7 @@ class DetermineBasalHelper @Inject constructor(
     fun reason(rT: RT, msg: String) {
         if (rT.reason.toString().isNotEmpty()) rT.reason.append(". ")
         rT.reason.append(msg)
-        consoleLog.add(msg)
+  //      consoleLog.add(msg)
     }
     /**
      * Adds reason to rT.reason only
@@ -79,7 +79,13 @@ class DetermineBasalHelper @Inject constructor(
     fun getMaxSafeBasal(profile: OapsProfileAutoIsf): Double =
         min(profile.max_basal, min(profile.max_daily_safety_multiplier * profile.max_daily_basal, profile.current_basal_safety_multiplier * profile.current_basal))
 
-    fun setTempBasal(rate: Double, duration: Int, currentBasal: Double, skipNeutralTemps: Boolean, maxSafeBasal: Double, rT: RT, currenttemp: CurrentTemp): RT {
+    fun setTempBasal(rate: Double, duration: Int, profile: OapsProfile, rT: RT, currenttemp: CurrentTemp): RT {
+        return newTempBasal(rate, duration, profile.current_basal, profile.skip_neutral_temps, getMaxSafeBasal(profile), rT, currenttemp)
+    }
+    fun setTempBasal(rate: Double, duration: Int, profile: OapsProfileAutoIsf, rT: RT, currenttemp: CurrentTemp): RT {
+        return newTempBasal(rate, duration, profile.current_basal, profile.skip_neutral_temps, getMaxSafeBasal(profile), rT, currenttemp)
+    }
+    private fun newTempBasal(rate: Double, duration: Int, currentBasal: Double, skipNeutralTemps: Boolean, maxSafeBasal: Double, rT: RT, currenttemp: CurrentTemp): RT {
         val suggestedRate = when {
             rate < 0 -> 0.0
             rate > maxSafeBasal -> maxSafeBasal
@@ -122,7 +128,7 @@ class DetermineBasalHelper @Inject constructor(
         return enable_smb(profile.allowSMB_with_high_temptarget, profile.temptargetSet, profile.enableSMB_always, profile.enableSMB_with_COB, profile.enableSMB_after_carbs, profile.enableSMB_with_temptarget, microBolusAllowed, meal_data, target_bg, consoleError)
     }
 
-    fun enable_smb(
+    private fun enable_smb(
         allowSMB_with_high_temptarget: Boolean,
         temptargetSet: Boolean,
         enableSMB_always: Boolean,

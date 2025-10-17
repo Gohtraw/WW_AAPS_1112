@@ -62,45 +62,27 @@ class DetermineBasalSMB @Inject constructor(
         val minAgo = dBH.round((systemTime - bgTime).milliseconds.toDouble(DurationUnit.MINUTES), 1)
         // TODO eliminate
         val bg = glucose_status.glucose
-        // TODO eliminate
-        val noise = glucose_status.noise
-        // 38 is an xDrip error state that usually indicates sensor failure
-        // all other BG values between 11 and 37 mg/dL reflect non-error-code BG values, so we should zero temp for those
-        if (bg <= 10 || bg == 38.0 || noise >= 3) {  //Dexcom is in ??? mode or calibrating, or xDrip reports high noise
-            rT.reason.append("CGM is calibrating, in ??? state, or noise is high")
-        }
-        if (minAgo > 12 || minAgo < -5) { // Dexcom data is too old, or way in the future
-            rT.reason.append("If current system time $systemTime is correct, then BG data is too old. The last BG data was read ${minAgo}m ago at $bgTime")
-            // if BG is too old/noisy, or is changing less than 1 mg/dL/5m for 45m, cancel any high temps and shorten any long zero temps
-        } else if (bg > 60 && flatBGsDetected) {
-            rT.reason.append("Error: CGM data is unchanged for the past ~45m")
-        }
-        if (bg <= 10 || bg == 38.0 || noise >= 3 || minAgo > 12 || minAgo < -5 || (bg > 60 && flatBGsDetected)) {
-            if (currenttemp.rate > basal) { // high temp is running
-                rT.reason.append(". Replacing high temp basal of ${currenttemp.rate} with neutral temp of $basal")
-                rT.deliverAt = deliverAt
-                rT.duration = 30
-                rT.rate = basal
-                return rT
-            } else if (currenttemp.rate == 0.0 && currenttemp.duration > 30) { //shorten long zero temps to 30m
-                rT.reason.append(". Shortening " + currenttemp.duration + "m long zero temp to 30m. ")
-                rT.deliverAt = deliverAt
-                rT.duration = 30
-                rT.rate = 0.0
-                return rT
-            } else { //do nothing.
-                rT.reason.append(". Temp ${currenttemp.rate} <= current basal ${round(basal, 2)}U/hr; doing nothing. ")
-                return rT
-            }
+
+        if (cgmGuard.checkDataAndAdjustTempBasal(
+                glucoseStatus = glucose_status,
+                minAgo = minAgo,
+                flatBGsDetected = flatBGsDetected,
+                currenttemp = currenttemp,
+                basal = basal,
+                rT = rT,
+                dBH = dBH
+            )
+        ) {
+            return rT
         }
 
         // TODO eliminate
-        val max_iob = profile.max_iob // maximum amount of non-bolus IOB OpenAPS will ever deliver
+//       val max_iob = profile.max_iob // maximum amount of non-bolus IOB OpenAPS will ever deliver
 
         // BG target in profile is defined by min and max. We use the middle of the range for our calculations.
+        var target_bg = (profile.min_bg + profile.max_bg) / 2
         var min_bg = profile.min_bg
         var max_bg = profile.max_bg
-        var target_bg = (profile.min_bg + profile.max_bg) / 2
 
         var sensitivityRatio: Double
         val high_temptarget_raises_sensitivity = profile.exercise_mode || profile.high_temptarget_raises_sensitivity
@@ -735,14 +717,6 @@ class DetermineBasalSMB @Inject constructor(
             enableSMB = false
         }
 
-        // mod no smb if bg < 100
-        if (enableSMB && bg < 100) {
-            consoleError.add("BG < 100 - disabling SMB")
-            rT.reason.append("BG < 100 - disabling SMB")
-            enableSMB = false
-        }
-        // end mod
-
         consoleError.add("BG projected to remain above ${dBH.convertBg(min_bg)} for $minutesAboveMinBG minutes")
         if (minutesAboveThreshold < 240 || minutesAboveMinBG < 60) {
             consoleError.add("BG projected to remain above ${dBH.convertBg(threshold)} for $minutesAboveThreshold minutes")
@@ -776,7 +750,7 @@ class DetermineBasalSMB @Inject constructor(
             durationReq = (durationReq / 30.0).roundToInt() * 30
             // always set a 30-120m zero temp (oref0-pump-loop will let any longer SMB zero temp run)
             durationReq = min(120, max(30, durationReq))
-            return setTempBasal(0.0, durationReq, profile, rT, currenttemp)
+            return dBH.setTempBasal(0.0, durationReq, profile, rT, currenttemp)
         }
 
         // if not in LGS mode, cancel temps before the top of the hour to reduce beeping/vibration
@@ -784,29 +758,29 @@ class DetermineBasalSMB @Inject constructor(
         val minutes = Instant.ofEpochMilli(rT.deliverAt!!).atZone(ZoneId.systemDefault()).toLocalDateTime().minute
         if (profile.skip_neutral_temps && minutes >= 55) {
             rT.reason.append("; Canceling temp at " + minutes + "m past the hour. ")
-            return setTempBasal(0.0, 0, profile, rT, currenttemp)
+            return dBH.setTempBasal(0.0, 0, profile, rT, currenttemp)
         }
 
         if (eventualBG < min_bg) { // if eventual BG is below target:
-            rT.reason.append("Eventual BG ${convert_bg(eventualBG)} < ${convert_bg(min_bg)}")
+            rT.reason.append("Eventual BG ${dBH.convertBg(eventualBG)} < ${dBH.convertBg(min_bg)}")
             // if 5m or 30m avg BG is rising faster than expected delta
             if (minDelta > expectedDelta && minDelta > 0 && carbsReq == 0) {
                 // if naive_eventualBG < 40, set a 30m zero temp (oref0-pump-loop will let any longer SMB zero temp run)
                 if (naive_eventualBG < 40) {
                     rT.reason.append(", naive_eventualBG < 40. ")
-                    return setTempBasal(0.0, 30, profile, rT, currenttemp)
+                    return dBH.setTempBasal(0.0, 30, profile, rT, currenttemp)
                 }
                 if (glucose_status.delta > minDelta) {
-                    rT.reason.append(", but Delta ${convert_bg(tick.toDouble())} > expectedDelta ${convert_bg(expectedDelta)}")
+                    rT.reason.append(", but Delta ${dBH.convertBg(tick.toDouble())} > expectedDelta ${dBH.convertBg(expectedDelta)}")
                 } else {
-                    rT.reason.append(", but Min. Delta ${minDelta.toFixed2()} > Exp. Delta ${convert_bg(expectedDelta)}")
+                    rT.reason.append(", but Min. Delta ${dBH.toFixed2(minDelta)} > Exp. Delta ${dBH.convertBg(expectedDelta)}")
                 }
-                if (currenttemp.duration > 15 && (round_basal(basal) == round_basal(currenttemp.rate))) {
-                    rT.reason.append(", temp " + currenttemp.rate + " ~ req " + round(basal, 2).withoutZeros() + "U/hr. ")
+                if (currenttemp.duration > 15 && (basal == currenttemp.rate)) {
+                    rT.reason.append(", temp " + currenttemp.rate + " ~ req " + dBH.withoutZeros(dBH.round(basal, 2)) + "U/hr. ")
                     return rT
                 } else {
-                    rT.reason.append("; setting current basal of ${round(basal, 2)} as temp. ")
-                    return setTempBasal(basal, 30, profile, rT, currenttemp)
+                    rT.reason.append("; setting current basal of ${dBH.round(basal, 2)} as temp. ")
+                    return dBH.setTempBasal(basal, 30, profile, rT, currenttemp)
                 }
             }
 
@@ -815,19 +789,19 @@ class DetermineBasalSMB @Inject constructor(
             var insulinReq =
                 if (dynIsfMode) 2 * min(0.0, (eventualBG - target_bg) / future_sens)
                 else 2 * min(0.0, (eventualBG - target_bg) / sens)
-            insulinReq = round(insulinReq, 2)
+            insulinReq = dBH.round(insulinReq, 2)
             // calculate naiveInsulinReq based on naive_eventualBG
             var naiveInsulinReq = min(0.0, (naive_eventualBG - target_bg) / sens)
-            naiveInsulinReq = round(naiveInsulinReq, 2)
+            naiveInsulinReq = dBH.round(naiveInsulinReq, 2)
             if (minDelta < 0 && minDelta > expectedDelta) {
                 // if we're barely falling, newinsulinReq should be barely negative
-                val newinsulinReq = round((insulinReq * (minDelta / expectedDelta)), 2)
+                val newinsulinReq = dBH.round((insulinReq * (minDelta / expectedDelta)), 2)
                 //console.error("Increasing insulinReq from " + insulinReq + " to " + newinsulinReq);
                 insulinReq = newinsulinReq
             }
             // rate required to deliver insulinReq less insulin over 30m:
             var rate = basal + (2 * insulinReq)
-            rate = round_basal(rate)
+
 
             // if required temp < existing temp basal
             val insulinScheduled = currenttemp.duration * (currenttemp.rate - basal) / 60
@@ -835,34 +809,34 @@ class DetermineBasalSMB @Inject constructor(
             // by both normal and naive calculations, then raise the rate
             val minInsulinReq = Math.min(insulinReq, naiveInsulinReq)
             if (insulinScheduled < minInsulinReq - basal * 0.3) {
-                rT.reason.append(", ${currenttemp.duration}m@${(currenttemp.rate).toFixed2()} is a lot less than needed. ")
-                return setTempBasal(rate, 30, profile, rT, currenttemp)
+                rT.reason.append(", ${currenttemp.duration}m@${dBH.toFixed2((currenttemp.rate))} is a lot less than needed. ")
+                return dBH.setTempBasal(rate, 30, profile, rT, currenttemp)
             }
             if (currenttemp.duration > 5 && rate >= currenttemp.rate * 0.8) {
-                rT.reason.append(", temp ${currenttemp.rate} ~< req ${round(rate, 2)}U/hr. ")
+                rT.reason.append(", temp ${currenttemp.rate} ~< req ${dBH.round(rate, 2)}U/hr. ")
                 return rT
             } else {
                 // calculate a long enough zero temp to eventually correct back up to target
                 if (rate <= 0) {
                     bgUndershoot = (target_bg - naive_eventualBG)
                     val worstCaseInsulinReq = bgUndershoot / sens
-                    var durationReq = round(60 * worstCaseInsulinReq / profile.current_basal)
+                    var durationReq = (60 * worstCaseInsulinReq / profile.current_basal).roundToInt()
                     if (durationReq < 0) {
                         durationReq = 0
                         // don't set a temp longer than 120 minutes
                     } else {
-                        durationReq = round(durationReq / 30.0) * 30
+                        durationReq = (durationReq / 30.0).roundToInt() * 30
                         durationReq = min(120, max(0, durationReq))
                     }
                     //console.error(durationReq);
                     if (durationReq > 0) {
                         rT.reason.append(", setting ${durationReq}m zero temp. ")
-                        return setTempBasal(rate, durationReq, profile, rT, currenttemp)
+                        return dBH.setTempBasal(rate, durationReq, profile, rT, currenttemp)
                     }
                 } else {
-                    rT.reason.append(", setting ${round(rate, 2)}U/hr. ")
+                    rT.reason.append(", setting ${dBH.round(rate, 2)}U/hr. ")
                 }
-                return setTempBasal(rate, 30, profile, rT, currenttemp)
+                return dBH.setTempBasal(rate, 30, profile, rT, currenttemp)
             }
         }
 
@@ -872,19 +846,19 @@ class DetermineBasalSMB @Inject constructor(
             if (!(microBolusAllowed && enableSMB)) {
                 if (glucose_status.delta < minDelta) {
                     rT.reason.append(
-                        "Eventual BG ${convert_bg(eventualBG)} > ${convert_bg(min_bg)} but Delta ${convert_bg(tick.toDouble())} < Exp. Delta ${
-                            convert_bg(expectedDelta)
+                        "Eventual BG ${dBH.convertBg(eventualBG)} > ${dBH.convertBg(min_bg)} but Delta ${dBH.convertBg(tick.toDouble())} < Exp. Delta ${
+                            dBH.convertBg(expectedDelta)
                         }"
                     )
                 } else {
-                    rT.reason.append("Eventual BG ${convert_bg(eventualBG)} > ${convert_bg(min_bg)} but Min. Delta ${minDelta.toFixed2()} < Exp. Delta ${convert_bg(expectedDelta)}")
+                    rT.reason.append("Eventual BG ${dBH.convertBg(eventualBG)} > ${dBH.convertBg(min_bg)} but Min. Delta ${dBH.toFixed2(minDelta)} < Exp. Delta ${dBH.convertBg(expectedDelta)}")
                 }
-                if (currenttemp.duration > 15 && (round_basal(basal) == round_basal(currenttemp.rate))) {
-                    rT.reason.append(", temp " + currenttemp.rate + " ~ req " + round(basal, 2).withoutZeros() + "U/hr. ")
+                if (currenttemp.duration > 15 && (basal == currenttemp.rate)) {
+                    rT.reason.append(", temp " + currenttemp.rate + " ~ req " + dBH.withoutZeros(dBH.round(basal, 2)) + "U/hr. ")
                     return rT
                 } else {
-                    rT.reason.append("; setting current basal of ${round(basal, 2)} as temp. ")
-                    return setTempBasal(basal, 30, profile, rT, currenttemp)
+                    rT.reason.append("; setting current basal of ${dBH.round(basal, 2)} as temp. ")
+                    return dBH.setTempBasal(basal, 30, profile, rT, currenttemp)
                 }
             }
         }
@@ -892,13 +866,13 @@ class DetermineBasalSMB @Inject constructor(
         if (min(eventualBG, minPredBG) < max_bg) {
             // if in SMB mode, don't cancel SMB zero temp
             if (!(microBolusAllowed && enableSMB)) {
-                rT.reason.append("${convert_bg(eventualBG)}-${convert_bg(minPredBG)} in range: no temp required")
-                if (currenttemp.duration > 15 && (round_basal(basal) == round_basal(currenttemp.rate))) {
-                    rT.reason.append(", temp ${currenttemp.rate} ~ req ${round(basal, 2).withoutZeros()}U/hr. ")
+                rT.reason.append("${dBH.convertBg(eventualBG)}-${dBH.convertBg(minPredBG)} in range: no temp required")
+                if (currenttemp.duration > 15 && (basal == currenttemp.rate)) {
+                    rT.reason.append(", temp ${currenttemp.rate} ~ req ${dBH.withoutZeros(dBH.round(basal, 2))}U/hr. ")
                     return rT
                 } else {
-                    rT.reason.append("; setting current basal of ${round(basal, 2)} as temp. ")
-                    return setTempBasal(basal, 30, profile, rT, currenttemp)
+                    rT.reason.append("; setting current basal of ${dBH.round(basal, 2)} as temp. ")
+                    return dBH.setTempBasal(basal, 30, profile, rT, currenttemp)
                 }
             }
         }
@@ -906,33 +880,33 @@ class DetermineBasalSMB @Inject constructor(
         // eventual BG is at/above target
         // if iob is over max, just cancel any temps
         if (eventualBG >= max_bg) {
-            rT.reason.append("Eventual BG " + convert_bg(eventualBG) + " >= " + convert_bg(max_bg) + ", ")
+            rT.reason.append("Eventual BG " + dBH.convertBg(eventualBG) + " >= " + dBH.convertBg(max_bg) + ", ")
         }
-        if (iob_data.iob > max_iob) {
-            rT.reason.append("IOB ${round(iob_data.iob, 2)} > max_iob $max_iob")
-            if (currenttemp.duration > 15 && (round_basal(basal) == round_basal(currenttemp.rate))) {
-                rT.reason.append(", temp ${currenttemp.rate} ~ req ${round(basal, 2).withoutZeros()}U/hr. ")
+        if (iob_data.iob > profile.max_iob) {
+            rT.reason.append("IOB ${dBH.round(iob_data.iob, 2)} > max_iob $profile.max_iob")
+            if (currenttemp.duration > 15 && (basal == currenttemp.rate)) {
+                rT.reason.append(", temp ${currenttemp.rate} ~ req ${dBH.withoutZeros(dBH.round(basal, 2))}U/hr. ")
                 return rT
             } else {
-                rT.reason.append("; setting current basal of ${round(basal, 2)} as temp. ")
-                return setTempBasal(basal, 30, profile, rT, currenttemp)
+                rT.reason.append("; setting current basal of ${dBH.round(basal, 2)} as temp. ")
+                return dBH.setTempBasal(basal, 30, profile, rT, currenttemp)
             }
         } else { // otherwise, calculate 30m high-temp required to get projected BG down to target
             // insulinReq is the additional insulin required to get minPredBG down to target_bg
             //console.error(minPredBG,eventualBG);
             var insulinReq =
-                if (dynIsfMode) round((min(minPredBG, eventualBG) - target_bg) / future_sens, 2)
-                else round((min(minPredBG, eventualBG) - target_bg) / sens, 2)
+                if (dynIsfMode) dBH.round((min(minPredBG, eventualBG) - target_bg) / future_sens, 2)
+                else dBH.round((min(minPredBG, eventualBG) - target_bg) / sens, 2)
             // if that would put us over max_iob, then reduce accordingly
-            if (insulinReq > max_iob - iob_data.iob) {
-                rT.reason.append("max_iob $max_iob, ")
-                insulinReq = max_iob - iob_data.iob
+            if (insulinReq > profile.max_iob - iob_data.iob) {
+                rT.reason.append("max_iob $profile.max_iob, ")
+                insulinReq = profile.max_iob - iob_data.iob
             }
 
             // rate required to deliver insulinReq more insulin over 30m:
             var rate = basal + (2 * insulinReq)
-            rate = round_basal(rate)
-            insulinReq = round(insulinReq, 3)
+
+            insulinReq = dBH.round(insulinReq, 3)
             rT.insulinReq = insulinReq
             //console.error(iob_data.lastBolusTime);
             //console.error(profile.temptargetSet, target_bg, rT.COB);
@@ -940,14 +914,14 @@ class DetermineBasalSMB @Inject constructor(
             val maxBolus: Double
             if (microBolusAllowed && enableSMB && bg > threshold) {
                 // never bolus more than maxSMBBasalMinutes worth of basal
-                val mealInsulinReq = round(meal_data.mealCOB / profile.carb_ratio, 3)
+                val mealInsulinReq = dBH.round(meal_data.mealCOB / profile.carb_ratio, 3)
                 if (iob_data.iob > mealInsulinReq && iob_data.iob > 0) {
                     consoleError.add("IOB ${iob_data.iob} > COB ${meal_data.mealCOB}; mealInsulinReq = $mealInsulinReq")
                     consoleError.add("profile.maxUAMSMBBasalMinutes: ${profile.maxUAMSMBBasalMinutes} profile.current_basal: ${profile.current_basal}")
-                    maxBolus = round(profile.current_basal * profile.maxUAMSMBBasalMinutes / 60, 1)
+                    maxBolus = dBH.round(profile.current_basal * profile.maxUAMSMBBasalMinutes / 60, 1)
                 } else {
                     consoleError.add("profile.maxSMBBasalMinutes: ${profile.maxSMBBasalMinutes} profile.current_basal: ${profile.current_basal}")
-                    maxBolus = round(profile.current_basal * profile.maxSMBBasalMinutes / 60, 1)
+                    maxBolus = dBH.round(profile.current_basal * profile.maxSMBBasalMinutes / 60, 1)
                 }
                 // bolus 1/2 the insulinReq, up to maxBolus, rounding down to nearest bolus increment
                 val roundSMBTo = 1 / profile.bolus_increment
@@ -955,7 +929,7 @@ class DetermineBasalSMB @Inject constructor(
                 // calculate a long enough zero temp to eventually correct back up to target
                 val smbTarget = target_bg
                 val worstCaseInsulinReq = (smbTarget - (naive_eventualBG + minIOBPredBG) / 2.0) / sens
-                var durationReq = round(60 * worstCaseInsulinReq / profile.current_basal)
+                var durationReq = (60 * worstCaseInsulinReq / profile.current_basal).roundToInt()
 
                 // if insulinReq > 0 but not enough for a microBolus, don't set an SMB zero temp
                 if (insulinReq > 0 && microBolus < profile.bolus_increment) {
@@ -967,11 +941,11 @@ class DetermineBasalSMB @Inject constructor(
                     durationReq = 0
                     // don't set an SMB zero temp longer than 60 minutes
                 } else if (durationReq >= 30) {
-                    durationReq = round(durationReq / 30.0) * 30
+                    durationReq = (durationReq / 30.0).roundToInt() * 30
                     durationReq = min(60, max(0, durationReq))
                 } else {
                     // if SMB durationReq is less than 30m, set a nonzero low temp
-                    smbLowTempReq = round(basal * durationReq / 30.0, 2)
+                    smbLowTempReq = dBH.round(basal * durationReq / 30.0, 2)
                     durationReq = 30
                 }
                 rT.reason.append(" insulinReq $insulinReq")
@@ -989,7 +963,7 @@ class DetermineBasalSMB @Inject constructor(
                 // allow SMBIntervals between 1 and 10 minutes
                 val SMBInterval = min(10, max(1, profile.SMBInterval)) * 60.0   // in seconds
                 //console.error(naive_eventualBG, insulinReq, worstCaseInsulinReq, durationReq);
-                consoleError.add("naive_eventualBG $naive_eventualBG,${durationReq}m ${smbLowTempReq}U/h temp needed; last bolus ${round(lastBolusAge / 60.0, 1)}m ago; maxBolus: $maxBolus")
+                consoleError.add("naive_eventualBG $naive_eventualBG,${durationReq}m ${smbLowTempReq}U/h temp needed; last bolus ${dBH.round(lastBolusAge / 60.0, 1)}m ago; maxBolus: $maxBolus")
                 if (lastBolusAge > SMBInterval - 6.0) {   // 6s tolerance
                     if (microBolus > 0) {
                         rT.units = microBolus
@@ -998,9 +972,9 @@ class DetermineBasalSMB @Inject constructor(
                 } else {
                     val nextBolusMins = (SMBInterval - lastBolusAge) / 60.0
                     val nextBolusSeconds = (SMBInterval - lastBolusAge) % 60
-                    val waitingSeconds = round(nextBolusSeconds, 0) % 60
-                    val waitingMins = round(nextBolusMins - waitingSeconds / 60.0, 0)
-                    rT.reason.append("Waiting ${waitingMins.withoutZeros()}m ${waitingSeconds.withoutZeros()}s to microbolus again.")
+                    val waitingSeconds = dBH.round(nextBolusSeconds, 0) % 60
+                    val waitingMins = dBH.round(nextBolusMins - waitingSeconds / 60.0, 0)
+                    rT.reason.append("Waiting ${dBH.withoutZeros(waitingMins)}m ${dBH.withoutZeros(waitingSeconds)}s to microbolus again.")
                 }
                 //rT.reason += ". ";
 
@@ -1013,32 +987,30 @@ class DetermineBasalSMB @Inject constructor(
 
             }
 
-            val maxSafeBasal = getMaxSafeBasal(profile)
-
             if (rate > maxSafeBasal) {
-                rT.reason.append("adj. req. rate: ${round(rate, 2)} to maxSafeBasal: ${maxSafeBasal.withoutZeros()}, ")
-                rate = round_basal(maxSafeBasal)
+                rT.reason.append("adj. req. rate: ${dBH.round(rate, 2)} to maxSafeBasal: ${dBH.withoutZeros(maxSafeBasal)}, ")
+                rate = maxSafeBasal
             }
 
             val insulinScheduled = currenttemp.duration * (currenttemp.rate - basal) / 60
             if (insulinScheduled >= insulinReq * 2) { // if current temp would deliver >2x more than the required insulin, lower the rate
-                rT.reason.append("${currenttemp.duration}m@${(currenttemp.rate).toFixed2()} > 2 * insulinReq. Setting temp basal of ${round(rate, 2)}U/hr. ")
-                return setTempBasal(rate, 30, profile, rT, currenttemp)
+                rT.reason.append("${currenttemp.duration}m@${dBH.toFixed2(currenttemp.rate)} > 2 * insulinReq. Setting temp basal of ${dBH.round(rate, 2)}U/hr. ")
+                return dBH.setTempBasal(rate, 30, profile, rT, currenttemp)
             }
 
             if (currenttemp.duration == 0) { // no temp is set
-                rT.reason.append("no temp, setting " + round(rate, 2).withoutZeros() + "U/hr. ")
-                return setTempBasal(rate, 30, profile, rT, currenttemp)
+                rT.reason.append("no temp, setting " + dBH.withoutZeros(dBH.round(rate, 2)) + "U/hr. ")
+                return dBH.setTempBasal(rate, 30, profile, rT, currenttemp)
             }
 
-            if (currenttemp.duration > 5 && (round_basal(rate) <= round_basal(currenttemp.rate))) { // if required temp <~ existing temp basal
-                rT.reason.append("temp ${(currenttemp.rate).toFixed2()} >~ req ${round(rate, 2).withoutZeros()}U/hr. ")
+            if (currenttemp.duration > 5 && (rate <= currenttemp.rate)) { // if required temp <~ existing temp basal
+                rT.reason.append("temp ${dBH.toFixed2(currenttemp.rate)} >~ req ${dBH.withoutZeros(dBH.round(rate, 2))}U/hr. ")
                 return rT
             }
 
             // required temp > existing temp basal
-            rT.reason.append("temp ${currenttemp.rate.toFixed2()} < ${round(rate, 2).withoutZeros()}U/hr. ")
-            return setTempBasal(rate, 30, profile, rT, currenttemp)
+            rT.reason.append("temp ${dBH.toFixed2(currenttemp.rate)} < ${dBH.withoutZeros(dBH.round(rate, 2))}U/hr. ")
+            return dBH.setTempBasal(rate, 30, profile, rT, currenttemp)
         }
     }
 }
