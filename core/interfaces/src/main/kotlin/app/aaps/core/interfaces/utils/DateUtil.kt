@@ -1,7 +1,6 @@
 package app.aaps.core.interfaces.utils
 
 import app.aaps.core.interfaces.resources.ResourceHelper
-import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
 /**
@@ -85,8 +84,9 @@ interface DateUtil {
     fun qs(x: Double, numDigits: Int): String
     fun formatHHMM(timeAsSeconds: Int): String
 
-    fun timeZoneByOffset(offsetInMilliseconds: Long): TimeZone
+    fun timeZoneByOffset(offsetInMilliseconds: Long): String
     fun timeStampToUtcDateMillis(timestamp: Long): Long
+    fun getTimestampWithCurrentTimeOfDay(timestamp: Long): Long
     fun mergeUtcDateToTimestamp(timestamp: Long, dateUtcMillis: Long): Long
     fun mergeHourMinuteToTimestamp(timestamp: Long, hour: Int, minute: Int, randomSecond: Boolean = false): Long
 }
