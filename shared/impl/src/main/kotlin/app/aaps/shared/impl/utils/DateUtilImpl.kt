@@ -31,34 +31,52 @@ import android.text.format.DateFormat as AndroidDateFormat
 @Singleton
 class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil {
 
+    /** The timezone is captured each time systemZone is accessed.*/
+    private val systemZone: ZoneId get() = ZoneId.systemDefault()
+    /** The timezone is captured ONCE when the app starts.*/
+    //private val systemZoneOnce: ZoneId = ZoneId.systemDefault()
+    /** The locale used for formatting strings (e.g., date formats, AM/PM) is captured each time displayLocale is accessed.*/
+    private val displayLocale: Locale get() = Locale.getDefault()
+
+    private fun getLocalizedTimeFormatter(withSeconds: Boolean = false): DateTimeFormatter {
+        val style = if (withSeconds) FormatStyle.MEDIUM else FormatStyle.SHORT
+        return DateTimeFormatter.ofLocalizedTime(style).withLocale(displayLocale)
+    }
+
     override fun fromISODateString(isoDateString: String): Long =
         Instant.parse(isoDateString).toEpochMilli()
 
-    override fun toISOString(date: Long): String =
-        ISO_INSTANT_FORMATTER.format(Instant.ofEpochMilli(date))
+    override fun toISOString(date: Long): String {
+        /** Formatter for converting an Instant to a standard ISO-8601 UTC string (e.g., "2023-10-27T10:30:00Z"). */
+        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneId.of("UTC"))
+        return formatter.format(Instant.ofEpochMilli(date))
+    }
 
     override fun toISOAsUTC(timestamp: Long): String {
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'0000Z'", Locale.US)
         return formatter.withZone(ZoneId.of("UTC")).format(Instant.ofEpochMilli(timestamp))
     }
 
-    override fun toISONoZone(timestamp: Long): String =
-        Instant.ofEpochMilli(timestamp).atZone(systemZone).format(ISO_LOCAL_FORMATTER)
 
-    override fun secondsOfTheDayToMilliseconds(seconds: Int): Long {
+    override fun toISONoZone(timestamp: Long): String {
+        // Correctly apply the system zone to an instant and format it.
+        val instant = Instant.ofEpochMilli(timestamp)
+        val zonedDateTime = instant.atZone(systemZone)
+        return ISO_LOCAL_FORMATTER.format(zonedDateTime)
+//    override fun toISONoZone(timestamp: Long): String {
+//        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+//            .withZone(systemZone)
+//        return formatter.format(Instant.ofEpochMilli(timestamp))
+///    override fun toISONoZone(timestamp: Long): String =
+///        Instant.ofEpochMilli(timestamp).atZone(systemZone).format(ISO_LOCAL_FORMATTER)
+    }
+
+    override fun secondsOfTheDayToMilliseconds(seconds: Int): Long {    //TODO: check original version returned ms from epoch for "minutes of today if today were in january"
         val startOfToday = LocalDate.now(systemZone).atStartOfDay(systemZone)
         val targetTime = startOfToday.plusSeconds(seconds.toLong())
         return targetTime.toInstant().toEpochMilli()
     }
-    /*//TODO: check: original version returned ms from epoch for "minutes of today if today were in january"
-        override fun secondsOfTheDayToMilliseconds(seconds: Int): Long {
-        val calendar: Calendar = GregorianCalendar()
-        calendar[Calendar.MONTH] = 0 // Set january to be sure we miss DST changing
-        calendar[Calendar.HOUR_OF_DAY] = seconds / 60 / 60
-        calendar[Calendar.MINUTE] = seconds / 60 % 60
-        calendar[Calendar.SECOND] = 0
-        return calendar.timeInMillis
-    }*/
+
 
     override fun toSeconds(hhColonMm: String): Int {
         val p = Pattern.compile("(\\d+):(\\d+)( a.m.| p.m.| AM| PM|AM|PM|)")
@@ -79,21 +97,20 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
         Instant.ofEpochMilli(mills).atZone(systemZone).format(getLocalizedDateFormatter())
 
     override fun dateStringRelative(mills: Long, rh: ResourceHelper): String {
-        val day = dateString(mills)
         val beginOfToday = beginOfDay(now())
         return if (mills < now()) {// Past
             when {
                 mills > beginOfToday                     -> rh.gs(R.string.today)
                 mills > beginOfToday - T.days(1).msecs() -> rh.gs(R.string.yesterday)
                 mills > beginOfToday - T.days(7).msecs() -> dayAgo(mills, rh, true)
-                else                                     -> day
+                else                                     -> dateString(mills)
             }
         } else { // Future
             when {
                 mills < beginOfToday + T.days(1).msecs() -> rh.gs(R.string.later_today)
                 mills < beginOfToday + T.days(2).msecs() -> rh.gs(R.string.tomorrow)
                 mills < beginOfToday + T.days(7).msecs() -> dayAgo(mills, rh, true)
-                else                                     -> day
+                else                                     -> dateString(mills)
             }
         }
     }
@@ -105,9 +122,14 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
     }
 
     override fun timeString(): String = timeString(now())
-    override fun timeString(mills: Long): String {
+    /*override fun timeString(mills: Long): String {
         val pattern = if (AndroidDateFormat.is24HourFormat(context)) "HH:mm" else "hh:mm a"
         val formatter = DateTimeFormatter.ofPattern(pattern, displayLocale) // Use locale for "a" (AM/PM)
+        return Instant.ofEpochMilli(mills).atZone(systemZone).format(formatter)
+    }*/
+    override fun timeString(mills: Long): String {
+        val pattern = if (AndroidDateFormat.is24HourFormat(context)) "HH:mm" else "hh:mm a"
+        val formatter = DateTimeFormatter.ofPattern(pattern, displayLocale)
         return Instant.ofEpochMilli(mills).atZone(systemZone).format(formatter)
     }
 
@@ -155,9 +177,8 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
         .format(DateTimeFormatter.ofPattern("ww"))
 
     override fun timeStringWithSeconds(mills: Long): String {
-        val pattern = if (AndroidDateFormat.is24HourFormat(context)) "HH:mm:ss" else "hh:mm:ss a"
-        val formatter = DateTimeFormatter.ofPattern(pattern, displayLocale)
-        return Instant.ofEpochMilli(mills).atZone(systemZone).format(formatter)
+        val formatter = getLocalizedTimeFormatter(withSeconds = true)
+        return formatter.format(Instant.ofEpochMilli(mills).atZone(systemZone))
     }
 
     override fun dateAndTimeRangeString(start: Long, end: Long): String =
@@ -324,10 +345,10 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
         val hours = duration.toHours() % 24
         val minutes = duration.toMinutes() % 60
         return when {
-            days > 0 -> "$days $daysUnit $hours $hoursUnit"
-            hours > 0 -> "$hours $hoursUnit $minutes $minutesUnit"
+            days > 0 -> "$days $daysUnit $hours $hoursUnit "
+            hours > 0 -> "$hours $hoursUnit $minutes $minutesUnit "
             else -> "${duration.toMinutes()} $minutesUnit"
-        }.trim()
+        }//.trim()
     }
 
     override fun niceTimeScalar(time: Long, rh: ResourceHelper): String {
@@ -415,19 +436,9 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
 
     override fun timeStampToUtcDateMillis(timestamp: Long): Long =
         Instant.ofEpochMilli(timestamp).truncatedTo(ChronoUnit.DAYS).toEpochMilli()
-    /*    //TODO this has a different output than the old function.
-             Since that seems to be desired behaviour in the history browser,
-             the functionality was refactored in getTimestampWithCurrentTimeOfDay()
-
-    override fun timeStampToUtcDateMillis(timestamp: Long): Long {
-        val current = Calendar.getInstance().apply { timeInMillis = timestamp }
-        return Calendar.getInstance().apply {
-            set(Calendar.YEAR, current[Calendar.YEAR])
-            set(Calendar.MONTH, current[Calendar.MONTH])
-            set(Calendar.DAY_OF_MONTH, current[Calendar.DAY_OF_MONTH])
-        }.timeInMillis
-    }*/
-
+//TODO this has a different output than the old function.
+//Since that seems to be desired behaviour in the history browser,
+//the functionality was refactored in getTimestampWithCurrentTimeOfDay()
 
     override fun getTimestampWithCurrentTimeOfDay(timestamp: Long): Long {
         val inputDate = Instant.ofEpochMilli(timestamp).atZone(systemZone).toLocalDate()
@@ -458,14 +469,6 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
 
     companion object {
 
-         /** The timezone is captured each time systemZone is accessed.*/
-        private val systemZone: ZoneId get() = ZoneId.systemDefault()
-        /** The timezone is captured ONCE when the app starts.*/
-        private val systemZoneOnce: ZoneId = ZoneId.systemDefault()
-        /** The locale used for formatting strings (e.g., date formats, AM/PM) is captured each time displayLocale is accessed.*/
-        private val displayLocale: Locale get() = Locale.getDefault()
-        /** Formatter for converting an Instant to a standard ISO-8601 UTC string (e.g., "2023-10-27T10:30:00Z"). */
-        private val ISO_INSTANT_FORMATTER: DateTimeFormatter = DateTimeFormatter.ISO_INSTANT
         /** Formatter for creating a local ISO-like string without a timezone (e.g., "2023-10-27T10:30:00"). */
         private val ISO_LOCAL_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
         private val timeStrings = LongSparseArray<String>()
