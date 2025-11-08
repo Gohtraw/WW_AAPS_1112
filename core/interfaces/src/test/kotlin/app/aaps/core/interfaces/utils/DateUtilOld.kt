@@ -43,12 +43,12 @@ interface DateUtilOld {
     fun hourString(mills: Long): String
     fun amPm(): String
     fun amPm(mills: Long): String
-    fun dayNameString(format: String): String //changed because it broke the contract
-    fun dayNameString(mills: Long, format: String): String //changed because it broke the contract
+    fun dayNameString(format: String = "E"): String //fun dayNameString(format: String): String //original broke the contract
+    fun dayNameString(mills: Long, format: String = "E"): String //fun dayNameString(mills: Long, format: String): String //original broke the contract
     fun dayString(): String = dayString(now())
     fun dayString(mills: Long): String
-    fun monthString(format: String): String //changed because it broke the contract
-    fun monthString(mills: Long, format: String): String //changed because it broke the contract
+    fun monthString(format: String = "MMM"): String //fun monthString(format: String): String //original broke the contract
+    fun monthString(mills: Long, format: String = "MMM"): String //fun monthString(mills: Long, format: String): String //original broke the contract
     fun weekString(): String
     fun weekString(mills: Long): String
     fun timeStringWithSeconds(mills: Long): String
@@ -62,7 +62,7 @@ interface DateUtilOld {
     fun minAgoShort(time: Long?): String
     fun minAgoLong(rh: ResourceHelper, time: Long?): String
     fun hourAgo(time: Long, rh: ResourceHelper): String
-    fun dayAgo(time: Long, rh: ResourceHelper, round: Boolean): String //changed because it broke the contract
+    fun dayAgo(time: Long, rh: ResourceHelper, round: Boolean = false): String //fun dayAgo(time: Long, rh: ResourceHelper, round: Boolean): String //original broke the contract
     fun beginOfDay(mills: Long): Long
     fun timeStringFromSeconds(seconds: Int): String
     fun timeFrameString(timeInMillis: Long, rh: ResourceHelper): String
@@ -88,5 +88,5 @@ interface DateUtilOld {
     fun timeZoneByOffset(offsetInMilliseconds: Long): TimeZone
     fun timeStampToUtcDateMillis(timestamp: Long): Long
     fun mergeUtcDateToTimestamp(timestamp: Long, dateUtcMillis: Long): Long
-    fun mergeHourMinuteToTimestamp(timestamp: Long, hour: Int, minute: Int, randomSecond: Boolean): Long //changed because it broke the contract
+    fun mergeHourMinuteToTimestamp(timestamp: Long, hour: Int, minute: Int, randomSecond: Boolean = false): Long //fun mergeHourMinuteToTimestamp(timestamp: Long, hour: Int, minute: Int, randomSecond: Boolean): Long //original broke the contract
 }
