@@ -113,7 +113,7 @@ class HistoryBrowseActivity : TranslatedDaggerAppCompatActivity() {
 
         binding.date.setOnClickListener {
             MaterialDatePicker.Builder.datePicker()
-                .setSelection(dateUtil.timeStampToUtcDateMillis(historyBrowserData.overviewData.fromTime))
+                .setSelection(dateUtil.getTimestampWithCurrentTimeOfDay(historyBrowserData.overviewData.fromTime))
                 .setTheme(app.aaps.core.ui.R.style.DatePicker)
                 .build()
                 .apply {
