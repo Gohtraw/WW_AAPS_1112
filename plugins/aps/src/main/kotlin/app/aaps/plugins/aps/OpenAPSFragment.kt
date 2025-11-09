@@ -192,10 +192,10 @@ class OpenAPSFragment : DaggerFragment(), MenuProvider {
                         if (property.findAnnotation<DisplayAsDate>() != null && value is Long) {
                             if (value > 0) { // Good practice to check for valid (positive) timestamps
                                 val formattedDate = dateUtil.dateAndTimeString(value)
-                                sb.append(property.name.bold(), ": ", value.toString(), " (", formattedDate, ")", br)
+                                sb.append(property.name.bold(), ": "/*, value.toString(), " ("*/, formattedDate/*, ")"*/, br)
                             } else {
                                 // Handle invalid/default timestamps (e.g., -1 for dateCreated)
-                                sb.append(property.name.bold(), ": ", value.toString(), " (Timestamp not set or invalid)", br)
+                                sb.append(property.name.bold(), ": ", value.toString(), " (invalid Timestamp)", br)
                             }
                         } else if (ClassUtils.isPrimitiveOrWrapper(value::class.java)) {
                             sb.append(property.name.bold(), ": ", value.toString(), br)
@@ -217,9 +217,9 @@ class OpenAPSFragment : DaggerFragment(), MenuProvider {
                         if (property.findAnnotation<DisplayAsDate>() != null && value is Long) {
                             if (value > 0) { // Good practice for timestamps
                                 val formattedDate = dateUtil.dateAndTimeString(value)
-                                sb.append(property.name.bold(), ": ", value.toString(), " (", formattedDate, ")", br)
+                                sb.append(property.name.bold(), ": "/*, value.toString(), " ("*/, formattedDate/*, ")"*/, br)
                             } else {
-                                sb.append(propertyName.bold(), ": ", value.toString(), " (Timestamp not set or invalid)", br)
+                                sb.append(propertyName.bold(), ": ", value.toString(), " (invalid Timestamp)", br)
                             }
                         } else if (ClassUtils.isPrimitiveOrWrapper(value::class.java)) {
                             sb.append(propertyName.bold(), ": ", value.toString(), br)
