@@ -348,29 +348,33 @@ class DateUtilImpl @Inject constructor(
     }
 
     override fun timeAgoFullString(milliseconds: Long, rh: ResourceHelper): String {
-        if (milliseconds > 0) {
-            // Show patch start time and age
-            val daysAgo = T.msecs(milliseconds).days()
-            val hoursAgo = T.msecs(milliseconds).hours() % 24
-            val minutesAgo = T.msecs(milliseconds).mins() % 60
+        if (milliseconds <= 0) {
+            return ""
+        }
 
-            val agoString = if (daysAgo > 0)
+        // THE FIX: Use kotlin.time.Duration for consistency and clarity.
+        val duration = milliseconds.milliseconds
+
+        // Use standard Duration components to get the parts. This is safer than manual math.
+        val days = duration.inWholeDays
+        val hours = (duration - days.days).inWholeHours
+        val minutes = (duration - days.days - hours.hours).inWholeMinutes
+
+        // The 'when' block is a cleaner way to write the if-else-if chain.
+        return when {
+            days > 0 ->
                 // Show multiple day(s) and hours ago
-                rh.gq(R.plurals.plurals_day_hour_ago, daysAgo.toInt(), daysAgo.toString(), hoursAgo.toString())
-            else if (hoursAgo > 0)
+                rh.gq(R.plurals.plurals_day_hour_ago, days.toInt(), days.toString(), hours.toString())
+            hours > 0 ->
                 // Only show single hour(s) ago
-                rh.gq(R.plurals.plurals_hour_ago, hoursAgo.toInt(), hoursAgo.toString())
-            else if (minutesAgo > 0)
+                rh.gq(R.plurals.plurals_hour_ago, hours.toInt(), hours.toString())
+            minutes > 0 ->
                 // Only show minute(s) ago
-                rh.gq(R.plurals.plurals_minute_ago, minutesAgo.toInt(), minutesAgo.toString())
-            else
+                rh.gq(R.plurals.plurals_minute_ago, minutes.toInt(), minutes.toString())
+            else ->
                 // Show other
                 rh.gs(R.string.seconds_ago)
-
-            return agoString
         }
-        else
-            return ""
     }
 
     override fun age(milliseconds: Long, useShortText: Boolean, rh: ResourceHelper): String {
