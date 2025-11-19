@@ -40,6 +40,13 @@ interface DateUtil {
     fun toISONoZone(timestamp: Long): String
 
     /**
+     * Converts a number of minutes from the beginning of today into a full Unix timestamp for that time.
+     * @param seconds The number of seconds past midnight.
+     * @return The full timestamp in milliseconds for that time on the current day.
+     */
+    fun minutesOfTheDayToMilliseconds(seconds: Int): Long
+
+    /**
      * Converts a number of seconds from the beginning of today into a full Unix timestamp for that time.
      * @param seconds The number of seconds past midnight.
      * @return The full timestamp in milliseconds for that time on the current day.
@@ -355,6 +362,12 @@ interface DateUtil {
      * @return The standard offset in milliseconds.
      */
     fun getTimeZoneOffsetMs(): Long
+
+    /**
+     * Gets the DST-aware timezone offset for the app's `systemZone` in milliseconds.
+     * @return The standard offset in milliseconds.
+     */
+    fun getTimeZoneOffsetMsWithDST(): Long
 
     /**
      * Gets the timezone offset in minutes for a specific moment in time.

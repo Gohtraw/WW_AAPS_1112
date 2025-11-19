@@ -51,8 +51,12 @@ class DateUtilImplTest : TestBase() {
         assertThat(DateUtilImpl(context).toISOString(1513902750000L)).isEqualTo("2017-12-22T00:32:30.000Z")
     }
 
+    @Test fun minutesOfTheDayToMillisecondsTest() {
+        assertThat(Date(DateUtilImpl(context).minutesOfTheDayToMilliseconds((T.hours(1).secs() + T.mins(1).secs() + 23).toInt())).toString()).contains("01:01:00")
+    }
+
     @Test fun secondsOfTheDayToMillisecondsTest() {
-        assertThat(Date(DateUtilImpl(context).secondsOfTheDayToMilliseconds((T.hours(1).secs() + T.mins(1).secs() + 1).toInt())).toString()).contains("01:01:00")
+        assertThat(Date(DateUtilImpl(context).secondsOfTheDayToMilliseconds((T.hours(1).secs() + T.mins(1).secs() + 1).toInt())).toString()).contains("01:01:01")
     }
 
     @Test fun toSecondsTest() {

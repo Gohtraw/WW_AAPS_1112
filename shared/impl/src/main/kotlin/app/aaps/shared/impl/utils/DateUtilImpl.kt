@@ -2,21 +2,22 @@ package app.aaps.shared.impl.utils
 
 import android.content.Context
 import androidx.collection.LongSparseArray
-import app.aaps.core.data.time.T
 import app.aaps.core.interfaces.R
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.SafeParse
-import app.aaps.core.utils.pump.ThreadUtil
 import java.security.SecureRandom
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatterBuilder
 import java.time.format.FormatStyle
+import java.time.temporal.ChronoField
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -26,23 +27,39 @@ import javax.inject.Singleton
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.DurationUnit
 import android.text.format.DateFormat as AndroidDateFormat
 
 @Singleton
-class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil {
+class DateUtilImpl @Inject constructor(
+    private val context: Context,
+    private val clock: Clock = Clock.systemDefaultZone()
+) : DateUtil {
 
     /** The timezone is captured each time systemZone is accessed.*/
     private val systemZone: ZoneId get() = ZoneId.systemDefault()
     /** The locale used for formatting strings (e.g., date formats, AM/PM) is captured each time displayLocale is accessed.*/
     private val displayLocale: Locale get() = Locale.getDefault()
 
-    private fun getLocalizedTimeFormatter(withSeconds: Boolean = false): DateTimeFormatter {
-        val style = if (withSeconds) FormatStyle.MEDIUM else FormatStyle.SHORT
-        return DateTimeFormatter.ofLocalizedTime(style).withLocale(displayLocale)
+    override fun fromISODateString(isoDateString: String): Long {
+        // This custom formatter handles multiple common ISO-like formats.
+        val formatter = DateTimeFormatterBuilder()
+            // 1. Append the standard date and time part
+            .append(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+            // 2. Optionally append fractional seconds (milliseconds)
+            .optionalStart()
+            .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
+            .optionalEnd()
+            // 3. Append an offset pattern that can handle "+HHMM" (no colon)
+            //    The second argument "Z" tells it to use 'Z' for a zero offset.
+            .appendOffset("+HHMM", "Z")
+            .toFormatter()
+        return ZonedDateTime.parse(isoDateString, formatter).toInstant().toEpochMilli()
     }
-
-    override fun fromISODateString(isoDateString: String): Long =
-        Instant.parse(isoDateString).toEpochMilli()
 
     override fun toISOString(date: Long): String {
         /** Formatter for converting an Instant to a standard ISO-8601 UTC string (e.g., "2023-10-27T10:30:00Z"). */
@@ -61,8 +78,17 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
         return ISO_LOCAL_FORMATTER.format(zonedDateTime)
     }
 
-    override fun secondsOfTheDayToMilliseconds(seconds: Int): Long {    //TODO: check original version returned ms from epoch for "minutes of today if today were in january"
-        val startOfToday = LocalDate.now(systemZone).atStartOfDay(systemZone)
+    override fun minutesOfTheDayToMilliseconds(seconds: Int): Long {
+        //TODO: This function replicates the old "secondsOfTheDayToMilliseconds",
+        // which ignored the seconds component of the input.
+        val startOfToday = LocalDate.now(clock).atStartOfDay(systemZone)
+        val totalMinutes = seconds / 60
+        val targetTime = startOfToday.plusMinutes(totalMinutes.toLong())
+        return targetTime.toInstant().toEpochMilli()
+    }
+
+    override fun secondsOfTheDayToMilliseconds(seconds: Int): Long {
+        val startOfToday = LocalDate.now(clock).atStartOfDay(systemZone)
         val targetTime = startOfToday.plusSeconds(seconds.toLong())
         return targetTime.toInstant().toEpochMilli()
     }
@@ -85,21 +111,22 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
     override fun dateString(mills: Long): String =
         Instant.ofEpochMilli(mills).atZone(systemZone).format(getLocalizedDateFormatter())
 
-    override fun dateStringRelative(mills: Long, rh: ResourceHelper): String {
-        val beginOfToday = beginOfDay(now())
-        return if (mills < now()) {// Past
+    override fun dateStringRelative(mills: Long, rh: ResourceHelper): String {        // Get the current time and the start of today as simple millisecond timestamps.
+        val nowMillis = now()
+        val startOfTodayMillis = beginOfDay(nowMillis)
+        return if (mills < nowMillis) { // Past
             when {
-                mills > beginOfToday                     -> rh.gs(R.string.today)
-                mills > beginOfToday - T.days(1).msecs() -> rh.gs(R.string.yesterday)
-                mills > beginOfToday - T.days(7).msecs() -> dayAgo(mills, rh, true)
-                else                                     -> dateString(mills)
+                mills > startOfTodayMillis                                  -> rh.gs(R.string.today)
+                mills > startOfTodayMillis - 1.days.inWholeMilliseconds -> rh.gs(R.string.yesterday)
+                mills > startOfTodayMillis - 7.days.inWholeMilliseconds -> dayAgo(mills, rh, true)
+                else                                                        -> dateString(mills)
             }
         } else { // Future
             when {
-                mills < beginOfToday + T.days(1).msecs() -> rh.gs(R.string.later_today)
-                mills < beginOfToday + T.days(2).msecs() -> rh.gs(R.string.tomorrow)
-                mills < beginOfToday + T.days(7).msecs() -> dayAgo(mills, rh, true)
-                else                                     -> dateString(mills)
+                mills < startOfTodayMillis + 1.days.inWholeMilliseconds -> rh.gs(R.string.later_today)
+                mills < startOfTodayMillis + 2.days.inWholeMilliseconds -> rh.gs(R.string.tomorrow)
+                mills < startOfTodayMillis + 7.days.inWholeMilliseconds -> dayAgo(mills, rh, true)
+                else                                                        -> dateString(mills)
             }
         }
     }
@@ -119,49 +146,43 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
 
     override fun secondString(): String = secondString(now())
     override fun secondString(mills: Long): String =
-        ZonedDateTime.ofInstant(Instant.ofEpochMilli(mills), systemZone)
-        .format(DateTimeFormatter.ofPattern("ss"))
+        ZonedDateTime.ofInstant(Instant.ofEpochMilli(mills), systemZone).format(DateTimeFormatter.ofPattern("ss"))
 
     override fun minuteString(): String = minuteString(now())
     override fun minuteString(mills: Long): String =
-        ZonedDateTime.ofInstant(Instant.ofEpochMilli(mills), systemZone)
-        .format(DateTimeFormatter.ofPattern("mm"))
+        ZonedDateTime.ofInstant(Instant.ofEpochMilli(mills), systemZone).format(DateTimeFormatter.ofPattern("mm"))
 
     override fun hourString(): String = hourString(now())
     override fun hourString(mills: Long): String {
-        val pattern = if (AndroidDateFormat.is24HourFormat(context)) "H" else "h"
+        val pattern = if (AndroidDateFormat.is24HourFormat(context)) "HH" else "hh"
         val formatter = DateTimeFormatter.ofPattern(pattern)
         return ZonedDateTime.ofInstant(Instant.ofEpochMilli(mills), systemZone).format(formatter)
     }
 
     override fun amPm(): String = amPm(now())
     override fun amPm(mills: Long): String =
-        ZonedDateTime.ofInstant(Instant.ofEpochMilli(mills), systemZone)
-        .format(DateTimeFormatter.ofPattern("a", displayLocale))
+        ZonedDateTime.ofInstant(Instant.ofEpochMilli(mills), systemZone).format(DateTimeFormatter.ofPattern("a", displayLocale))
 
     override fun dayNameString(format: String): String = dayNameString(now(), format)
     override fun dayNameString(mills: Long, format: String): String =
-        ZonedDateTime.ofInstant(Instant.ofEpochMilli(mills), systemZone)
-        .format(DateTimeFormatter.ofPattern(format, displayLocale))
+        ZonedDateTime.ofInstant(Instant.ofEpochMilli(mills), systemZone).format(DateTimeFormatter.ofPattern(format, displayLocale))
 
     override fun dayString(): String = dayString(now())
     override fun dayString(mills: Long): String =
-        ZonedDateTime.ofInstant(Instant.ofEpochMilli(mills), systemZone)
-        .format(DateTimeFormatter.ofPattern("dd"))
+        ZonedDateTime.ofInstant(Instant.ofEpochMilli(mills), systemZone).format(DateTimeFormatter.ofPattern("dd"))
 
     override fun monthString(format: String): String = monthString(now(), format)
     override fun monthString(mills: Long, format: String): String =
-        ZonedDateTime.ofInstant(Instant.ofEpochMilli(mills), systemZone)
-        .format(DateTimeFormatter.ofPattern(format, displayLocale))
+        ZonedDateTime.ofInstant(Instant.ofEpochMilli(mills), systemZone).format(DateTimeFormatter.ofPattern(format, displayLocale))
 
     override fun weekString(): String = weekString(now())
     override fun weekString(mills: Long): String =
-        ZonedDateTime.ofInstant(Instant.ofEpochMilli(mills), systemZone)
-        .format(DateTimeFormatter.ofPattern("ww"))
+        ZonedDateTime.ofInstant(Instant.ofEpochMilli(mills), systemZone).format(DateTimeFormatter.ofPattern("ww"))
 
     override fun timeStringWithSeconds(mills: Long): String {
-        val formatter = getLocalizedTimeFormatter(withSeconds = true)
-        return formatter.format(Instant.ofEpochMilli(mills).atZone(systemZone))
+        val pattern = if (AndroidDateFormat.is24HourFormat(context)) "HH:mm:ss" else "hh:mm:ss a"
+        val formatter = DateTimeFormatter.ofPattern(pattern, displayLocale)
+        return Instant.ofEpochMilli(mills).atZone(systemZone).format(formatter)
     }
 
     override fun dateAndTimeRangeString(start: Long, end: Long): String =
@@ -181,54 +202,62 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
 
     override fun minAgo(rh: ResourceHelper, time: Long?): String {
         if (time == null) return ""
-        val minutes = ((now() - time) / 1000 / 60).toInt()
+        val duration = (now() - time).milliseconds
+        val minutes = duration.inWholeMinutes.toInt()
         return if (abs(minutes) > 9999) "" else rh.gs(R.string.minago, minutes)
     }
 
     override fun minOrSecAgo(rh: ResourceHelper, time: Long?): String {
         if (time == null) return ""
-        //val minutes = ((now() - time) / 1000 / 60).toInt()
-        val seconds = (now() - time) / 1000
-        return if (seconds > 119) {
-            rh.gs(R.string.minago, (seconds / 60).toInt())
-        } else {
-            rh.gs(R.string.secago, seconds.toInt())
+        val duration = (now() - time).milliseconds
+        return when {
+            duration.inWholeMinutes >= 2 -> { // If the duration is 2 minutes or more, show minutes
+                rh.gs(R.string.minago, duration.inWholeMinutes.toInt())
+            }
+            else                         -> { // Otherwise, show seconds
+                rh.gs(R.string.secago, duration.inWholeSeconds.toInt())
+            }
         }
     }
 
     override fun minAgoShort(time: Long?): String {
         if (time == null) return ""
-        val minutes = ((time - now()) / 1000 / 60).toInt()
+        val duration = (time - now()).milliseconds
+        val minutes = duration.inWholeMinutes.toInt()
         return if (abs(minutes) > 9999) ""
         else "(" + (if (minutes > 0) "+" else "") + minutes + ")"
     }
 
     override fun minAgoLong(rh: ResourceHelper, time: Long?): String {
         if (time == null) return ""
-        val minutes = ((now() - time) / 1000 / 60).toInt()
+        val duration = (now() - time).milliseconds
+        val minutes = duration.inWholeMinutes.toInt()
         return if (abs(minutes) > 9999) "" else rh.gs(R.string.minago_long, minutes)
     }
 
     override fun hourAgo(time: Long, rh: ResourceHelper): String {
-        val hours = (now() - time) / 1000.0 / 60 / 60
+        val duration = (now() - time).milliseconds
+        val hours = duration.inWholeHours
         return rh.gs(R.string.hoursago, hours)
     }
 
     override fun dayAgo(time: Long, rh: ResourceHelper, round: Boolean): String {
-        var days = (now() - time) / 1000.0 / 60 / 60 / 24
+        val duration = (now() - time).milliseconds
         if (round) {
-            return if (now() > time) {
-                days = ceil(days)
-                rh.gs(R.string.days_ago_round, days)
+            val daysAsDouble = duration.toDouble(DurationUnit.DAYS)
+            return if (duration.isPositive()) {
+                val roundedDays = ceil(daysAsDouble)
+                rh.gs(R.string.days_ago_round, roundedDays)
             } else {
-                days = floor(days)
-                rh.gs(R.string.in_days_round, days)
+                val roundedDays = floor(daysAsDouble)
+                rh.gs(R.string.in_days_round, roundedDays)
             }
         }
-        return if (now() > time)
-            rh.gs(R.string.days_ago, days)
-        else
-            rh.gs(R.string.in_days, days)
+        return if (duration.isPositive()) {
+            rh.gs(R.string.days_ago, duration.inWholeDays)
+        } else {
+            rh.gs(R.string.in_days, abs(duration.inWholeDays))
+        }
     }
 
     override fun beginOfDay(mills: Long): Long =
@@ -245,30 +274,38 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
     }
 
     override fun timeFrameString(timeInMillis: Long, rh: ResourceHelper): String {
-        var remainingTimeMinutes = timeInMillis / (1000 * 60)
-        val remainingTimeHours = remainingTimeMinutes / 60
-        remainingTimeMinutes %= 60
-        return "(" + (if (remainingTimeHours > 0) remainingTimeHours.toString() + rh.gs(R.string.shorthour) + " " else "") + remainingTimeMinutes + "')"
+        val duration = timeInMillis.milliseconds
+        val totalHours = duration.inWholeHours
+        val remainingMinutes = (duration - totalHours.hours).inWholeMinutes
+        val hoursPart = if (totalHours > 0) "$totalHours${rh.gs(R.string.shorthour)} " else ""
+        return "($hoursPart$remainingMinutes')"
     }
 
     override fun sinceString(timestamp: Long, rh: ResourceHelper): String =
-        timeFrameString(System.currentTimeMillis() - timestamp, rh)
+        timeFrameString(now() - timestamp, rh)
 
-    override fun untilString(timestamp: Long, rh: ResourceHelper): String =
-         timeFrameString(timestamp - System.currentTimeMillis(), rh)
+    override fun untilString(timestamp: Long, rh: ResourceHelper): String {
+        val durationMillis = timestamp - now()
+        return timeFrameString(durationMillis, rh)
+    }
 
-    override fun now(): Long =
-        System.currentTimeMillis()
+    override fun now(): Long = clock.millis()
 
     override fun nowWithoutMilliseconds(): Long =
-        Instant.now().truncatedTo(ChronoUnit.SECONDS).toEpochMilli()
+        clock.instant().truncatedTo(ChronoUnit.SECONDS).toEpochMilli()
 
     override fun isOlderThan(date: Long, minutes: Long): Boolean =
-        Instant.ofEpochMilli(date).isBefore(Instant.now().minus(minutes, ChronoUnit.MINUTES))
+        Instant.ofEpochMilli(date).isBefore(clock.instant().minus(minutes, ChronoUnit.MINUTES))
 
-    override fun getTimeZoneOffsetMs(): Long { //TODO: This was and is not DST aware. Check if intended.
-        val standardOffset = systemZone.rules.getStandardOffset(Instant.now())
-        return standardOffset.totalSeconds * 1000L
+    override fun getTimeZoneOffsetMs(): Long {
+        val standardOffset = systemZone.rules.getStandardOffset(clock.instant())
+        return standardOffset.totalSeconds.seconds.inWholeMilliseconds
+    }
+// TODO: getTimeZoneOffsetMs was __AND IS__ not DST aware. Check if intended.
+//  If not intended, use the following:
+    override fun getTimeZoneOffsetMsWithDST(): Long {
+        val dSTAwareOffset = systemZone.rules.getOffset(clock.instant())
+        return dSTAwareOffset.totalSeconds.seconds.inWholeMilliseconds
     }
 
     override fun getTimeZoneOffsetMinutes(timestamp: Long): Int {
@@ -285,7 +322,7 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
     }
 
     override fun isAfterNoon(): Boolean =
-        ZonedDateTime.now(systemZone).hour >= 12
+        ZonedDateTime.now(clock).hour >= 12
 
     override fun isSameDayGroup(timestamp1: Long, timestamp2: Long): Boolean {
         val now = now()
@@ -295,73 +332,66 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
 
     //Map:{DAYS=1, HOURS=3, MINUTES=46, SECONDS=40, MILLISECONDS=0, MICROSECONDS=0, NANOSECONDS=0}
     override fun computeDiff(date1: Long, date2: Long): Map<TimeUnit, Long> {
-        val duration = java.time.Duration.ofMillis(date2 - date1)
-        val days = duration.toDays()
-        val hours = duration.toHours() % 24
-        val minutes = duration.toMinutes() % 60
-        val seconds = duration.seconds % 60
-        val millis = duration.toMillis() % 1000
-        val micros = duration.toNanos() / 1000 % 1000
-        val nanos = duration.toNanos() % 1000
-
-        return mapOf(
-            TimeUnit.DAYS to days,
-            TimeUnit.HOURS to hours,
-            TimeUnit.MINUTES to minutes,
-            TimeUnit.SECONDS to seconds,
-            TimeUnit.MILLISECONDS to millis,
-            TimeUnit.MICROSECONDS to micros,
-            TimeUnit.NANOSECONDS to nanos
-        )
+        val duration = (date2 - date1).milliseconds
+        return duration.toComponents { days, hours, minutes, seconds, nanoseconds ->
+            mapOf(
+                TimeUnit.DAYS to days,
+                TimeUnit.HOURS to hours.toLong(),
+                TimeUnit.MINUTES to minutes.toLong(),
+                TimeUnit.SECONDS to seconds.toLong(),
+                // Convert remaining nanoseconds into millis, micros, and nanos for the map.
+                TimeUnit.MILLISECONDS to nanoseconds.toLong() / 1_000_000,
+                TimeUnit.MICROSECONDS to (nanoseconds.toLong() / 1_000) % 1000,
+                TimeUnit.NANOSECONDS to nanoseconds.toLong() % 1000
+            )
+        }
     }
 
     override fun age(milliseconds: Long, useShortText: Boolean, rh: ResourceHelper): String {
-        val duration = java.time.Duration.ofMillis(milliseconds)
-        if (duration.toDays() > 1000) return rh.gs(R.string.forever)
+        val duration = milliseconds.milliseconds
+        if (duration.inWholeDays > 1000) return rh.gs(R.string.forever)
         val daysUnit = if (useShortText) rh.gs(R.string.shortday) else rh.gs(R.string.days)
         val hoursUnit = if (useShortText) rh.gs(R.string.shorthour) else rh.gs(R.string.hours)
         val minutesUnit = if (useShortText) rh.gs(R.string.shortminute) else rh.gs(R.string.unit_minutes)
-        val days = duration.toDays()
-        val hours = duration.toHours() % 24
-        val minutes = duration.toMinutes() % 60
+        val days = duration.inWholeDays
+        val hours = (duration - days.days).inWholeHours
+        val minutes = (duration - days.days - hours.hours).inWholeMinutes
         return when {
-            days > 0 -> "$days $daysUnit $hours $hoursUnit "
+            days > 0  -> "$days $daysUnit $hours $hoursUnit "
             hours > 0 -> "$hours $hoursUnit $minutes $minutesUnit "
-            else -> "${duration.toMinutes()} $minutesUnit"
-        }//.trim()
+            else      -> "${duration.inWholeMinutes} $minutesUnit"
+        }
     }
 
     override fun niceTimeScalar(time: Long, rh: ResourceHelper): String {
-        var t = time
-        var unit = rh.gs(R.string.unit_second)
-        t /= 1000
-        if (t != 1L) unit = rh.gs(R.string.unit_seconds)
-        if (t > 59) {
-            unit = rh.gs(R.string.unit_minute)
-            t /= 60
-            if (t != 1L) unit = rh.gs(R.string.unit_minutes)
-            if (t > 59) {
-                unit = rh.gs(R.string.unit_hour)
-                t /= 60
-                if (t != 1L) unit = rh.gs(R.string.unit_hours)
-                if (t > 24) {
-                    unit = rh.gs(R.string.unit_day)
-                    t /= 24
-                    if (t != 1L) unit = rh.gs(R.string.unit_days)
-                    if (t > 28) {
-                        unit = rh.gs(R.string.unit_week)
-                        t /= 7
-                        @Suppress("KotlinConstantConditions")
-                        if (t != 1L) unit = rh.gs(R.string.unit_weeks)
-                    }
-                }
+        val duration = time.milliseconds
+        val (value, unitId) = when {
+            duration.inWholeDays > 6 -> {
+                val weeks = duration.inWholeDays / 7
+                weeks to if (weeks == 1L) R.string.unit_week else R.string.unit_weeks
+            }
+            duration.inWholeHours > 23 -> {
+                val days = duration.inWholeDays
+                days to if (days == 1L) R.string.unit_day else R.string.unit_days
+            }
+            duration.inWholeMinutes > 59 -> {
+                val hours = duration.inWholeHours
+                hours to if (hours == 1L) R.string.unit_hour else R.string.unit_hours
+            }
+            duration.inWholeSeconds > 59 -> {
+                val minutes = duration.inWholeMinutes
+                minutes to if (minutes == 1L) R.string.unit_minute else R.string.unit_minutes
+            }
+            else -> {
+                val seconds = duration.inWholeSeconds
+                seconds to if (seconds == 1L) R.string.unit_second else R.string.unit_seconds
             }
         }
-        //if (t != 1) unit = unit + "s"; //implemented plurality in every step, because in other languages plurality of time is not every time adding the same character
-        return qs(t.toDouble(), 0) + " " + unit
+        return "${qs(value.toDouble(), 0)} ${rh.gs(unitId)}"
     }
 
     override fun qs(x: Double, numDigits: Int): String {
+        val formatter = decimalFormatter.get()
         var digits = numDigits
         if (digits == -1) {
             digits = 0
@@ -373,38 +403,25 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
                 }
             }
         }
-        if (dfs == null) {
-            val localDfs = DecimalFormatSymbols()
-            localDfs.decimalSeparator = '.'
-            dfs = localDfs // avoid race condition
-        }
-        val thisDf: DecimalFormat?
-        // use singleton if on ui thread otherwise allocate new as DecimalFormat is not thread safe
-        if (ThreadUtil.threadId() == 1L) {
-            if (df == null) {
-                val localDf = DecimalFormat("#", dfs)
-                localDf.minimumIntegerDigits = 1
-                df = localDf // avoid race condition
-            }
-            thisDf = df
-        } else {
-            thisDf = DecimalFormat("#", dfs)
-        }
-        thisDf?.maximumFractionDigits = digits
-        return thisDf?.format(x) ?: ""
+        // Use maximumFractionDigits to replicate the original behavior
+        // of not showing trailing zeros (e.g., 12.0 -> "12").
+        formatter!!.maximumFractionDigits = digits
+        // We must also set the minimum to 0 to allow for truncation.
+        formatter.minimumFractionDigits = 0
+        return formatter.format(x)
     }
 
     override fun formatHHMM(timeAsSeconds: Int): String {
-        val hours = timeAsSeconds / 3600
-        val minutes = (timeAsSeconds % 3600) / 60
-        // "%02d" means "format an integer (d) to be at least 2 digits wide, padding with zeros (0) if necessary."
+        val duration = timeAsSeconds.seconds
+        val hours = duration.inWholeHours
+        val minutes = (duration - hours.hours).inWholeMinutes
         return "%02d:%02d".format(hours, minutes)
     }
 
     override fun timeZoneByOffset(offsetInMilliseconds: Long): String {
         if (offsetInMilliseconds == 0L) return "UTC"
-        val offsetInSeconds = (offsetInMilliseconds / 1000).toInt()
-        val now = Instant.now()
+        val offsetInSeconds = offsetInMilliseconds.milliseconds.inWholeSeconds.toInt()
+        val now = clock.instant()
         return ZoneId.getAvailableZoneIds()
             .firstOrNull { zoneIdString ->
                 val zoneId = ZoneId.of(zoneIdString)
@@ -417,12 +434,12 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
     override fun timeStampToUtcDateMillis(timestamp: Long): Long =
         Instant.ofEpochMilli(timestamp).truncatedTo(ChronoUnit.DAYS).toEpochMilli()
 
-//TODO timeStampToUtcDateMillis has a different output than the old function.
-//Since that seems to be desired behaviour in the history browser,
-//the functionality was refactored in getTimestampWithCurrentTimeOfDay()
+    //TODO: timeStampToUtcDateMillis has a different output than the old function.
+    // Since that seems to be desired behaviour in the history browser,
+    // the functionality was refactored in getTimestampWithCurrentTimeOfDay()
     override fun getTimestampWithCurrentTimeOfDay(timestamp: Long): Long {
         val inputDate = Instant.ofEpochMilli(timestamp).atZone(systemZone).toLocalDate()
-        val timeOfNow = ZonedDateTime.now(systemZone).toLocalTime()
+        val timeOfNow = ZonedDateTime.now(clock).toLocalTime()
         return inputDate.atTime(timeOfNow).atZone(systemZone).toInstant().toEpochMilli()
     }
 
@@ -454,8 +471,15 @@ class DateUtilImpl @Inject constructor(private val context: Context) : DateUtil 
         private val timeStrings = LongSparseArray<String>()
         private var seconds: Int = (SecureRandom().nextDouble() * 59.0).toInt()
 
-        // singletons to avoid repeated allocation
-        private var dfs: DecimalFormatSymbols? = null
-        private var df: DecimalFormat? = null
+        val decimalFormatter = object : ThreadLocal<DecimalFormat>() {
+            override fun initialValue(): DecimalFormat {
+                // Each thread gets its own DecimalFormat instance, configured once.
+                return DecimalFormat().apply {
+                    decimalFormatSymbols = DecimalFormatSymbols().apply {
+                        decimalSeparator = '.'
+                    }
+                }
+            }
+        }
     }
 }
