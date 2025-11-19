@@ -351,29 +351,15 @@ class DateUtilImpl @Inject constructor(
         if (milliseconds <= 0) {
             return ""
         }
-
-        // THE FIX: Use kotlin.time.Duration for consistency and clarity.
         val duration = milliseconds.milliseconds
-
-        // Use standard Duration components to get the parts. This is safer than manual math.
         val days = duration.inWholeDays
         val hours = (duration - days.days).inWholeHours
         val minutes = (duration - days.days - hours.hours).inWholeMinutes
-
-        // The 'when' block is a cleaner way to write the if-else-if chain.
         return when {
-            days > 0 ->
-                // Show multiple day(s) and hours ago
-                rh.gq(R.plurals.plurals_day_hour_ago, days.toInt(), days.toString(), hours.toString())
-            hours > 0 ->
-                // Only show single hour(s) ago
-                rh.gq(R.plurals.plurals_hour_ago, hours.toInt(), hours.toString())
-            minutes > 0 ->
-                // Only show minute(s) ago
-                rh.gq(R.plurals.plurals_minute_ago, minutes.toInt(), minutes.toString())
-            else ->
-                // Show other
-                rh.gs(R.string.seconds_ago)
+            days > 0            -> rh.gq(R.plurals.plurals_day_hour_ago, days.toInt(), days.toString(), hours.toString())
+            hours > 0           -> rh.gq(R.plurals.plurals_hour_ago, hours.toInt(), hours.toString())
+            minutes > 0         -> rh.gq(R.plurals.plurals_minute_ago, minutes.toInt(), minutes.toString())
+            else                -> rh.gs(R.string.seconds_ago)
         }
     }
 
