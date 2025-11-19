@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mock
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -70,18 +71,18 @@ class DexcomWorkerTest : TestBaseWithProfile() {
         runBlocking {
             whenever(dexcomPlugin.isEnabled()).thenReturn(true)
             whenever(preferences.get(BooleanKey.BgSourceCreateSensorChange)).thenReturn(true)
-            whenever(persistenceLayer.insertCgmSourceData(anyObject(), anyObject(), anyObject(), anyObject())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
-            val bundle = BundleMock.mock().apply {
+            whenever(persistenceLayer.insertCgmSourceData(anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+            val bundle = BundleMock.mocked().apply {
                 putString("sensorType", "G6")
-                putBundle("glucoseValues", BundleMock.mock().apply {
-                    putBundle("0", BundleMock.mock().apply {
+                putBundle("glucoseValues", BundleMock.mocked().apply {
+                    putBundle("0", BundleMock.mocked().apply {
                         putLong("timestamp", timestamp)
                         putInt("glucoseValue", 150)
                         putString("trendArrow", "FortyFiveDown")
                     })
                 })
-                putBundle("meters", BundleMock.mock().apply {
-                    putBundle("0", BundleMock.mock().apply {
+                putBundle("meters", BundleMock.mocked().apply {
+                    putBundle("0", BundleMock.mocked().apply {
                         putLong("timestamp", timestamp)
                         putInt("meterValue", 150)
                     })
@@ -116,18 +117,18 @@ class DexcomWorkerTest : TestBaseWithProfile() {
         runBlocking {
             whenever(dexcomPlugin.isEnabled()).thenReturn(true)
             whenever(preferences.get(BooleanKey.BgSourceCreateSensorChange)).thenReturn(true)
-            whenever(persistenceLayer.insertCgmSourceData(anyObject(), anyObject(), anyObject(), anyObject())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
-            val bundle = BundleMock.mock().apply {
+            whenever(persistenceLayer.insertCgmSourceData(anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+            val bundle = BundleMock.mocked().apply {
                 putString("sensorType", "G7")
-                putBundle("glucoseValues", BundleMock.mock().apply {
-                    putBundle("0", BundleMock.mock().apply {
+                putBundle("glucoseValues", BundleMock.mocked().apply {
+                    putBundle("0", BundleMock.mocked().apply {
                         putLong("timestamp", timestamp)
                         putInt("glucoseValue", 150)
                         putString("trendArrow", "FortyFiveDown")
                     })
                 })
-                putBundle("meters", BundleMock.mock().apply {
-                    putBundle("0", BundleMock.mock().apply {
+                putBundle("meters", BundleMock.mocked().apply {
+                    putBundle("0", BundleMock.mocked().apply {
                         putLong("timestamp", 10000L)
                         putInt("meterValue", 150)
                     })
@@ -157,11 +158,11 @@ class DexcomWorkerTest : TestBaseWithProfile() {
         runBlocking {
             whenever(dexcomPlugin.isEnabled()).thenReturn(true)
             whenever(preferences.get(BooleanKey.BgSourceCreateSensorChange)).thenReturn(true)
-            whenever(persistenceLayer.insertCgmSourceData(anyObject(), anyObject(), anyObject(), anyObject())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
-            val bundle = BundleMock.mock().apply {
+            whenever(persistenceLayer.insertCgmSourceData(anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+            val bundle = BundleMock.mocked().apply {
                 putString("sensorType", "G9")
-                putBundle("glucoseValues", BundleMock.mock().apply {
-                    putBundle("0", BundleMock.mock().apply {
+                putBundle("glucoseValues", BundleMock.mocked().apply {
+                    putBundle("0", BundleMock.mocked().apply {
                         putLong("timestamp", timestamp)
                         putInt("glucoseValue", 150)
                         putString("trendArrow", "FortyFiveDown")
@@ -201,7 +202,7 @@ class DexcomWorkerTest : TestBaseWithProfile() {
     fun `When glucoseValues are missing then return failure`() {
         runBlocking {
             whenever(dexcomPlugin.isEnabled()).thenReturn(true)
-            val bundle = BundleMock.mock().apply {
+            val bundle = BundleMock.mocked().apply {
                 putString("sensorType", "G6")
             }
             whenever(dataWorkerStorage.pickupBundle(any())).thenReturn(bundle)

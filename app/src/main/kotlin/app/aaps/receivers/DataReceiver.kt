@@ -3,6 +3,7 @@ package app.aaps.receivers
 import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
+import androidx.annotation.VisibleForTesting
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
 import app.aaps.core.interfaces.logging.AAPSLogger
@@ -36,9 +37,13 @@ open class DataReceiver : DaggerBroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
+        processIntent(context, intent)
+    }
+
+    @VisibleForTesting
+    fun processIntent(context: Context, intent: Intent) {
         val bundle = intent.extras ?: return
         aapsLogger.debug(LTag.CORE, "onReceive ${intent.action} ${BundleLogger.log(bundle)}")
-
         when (intent.action) {
             Intents.ACTION_NEW_BG_ESTIMATE            ->
                 OneTimeWorkRequest.Builder(XdripSourcePlugin.XdripSourceWorker::class.java)
@@ -72,28 +77,28 @@ open class DataReceiver : DaggerBroadcastReceiver() {
                         it.copyString("data", bundle)
                     }.build()).build()
 
-            Intents.OTTAI_APP, Intents.OTTAI_APP_CN ->
+            Intents.OTTAI_APP, Intents.OTTAI_APP_CN   ->
                 OneTimeWorkRequest.Builder(OttaiPlugin.OttaiWorker::class.java)
                     .setInputData(Data.Builder().also {
                         it.copyString("collection", bundle)
                         it.copyString("data", bundle)
                     }.build()).build()
 
-            Intents.SYAI_APP                        ->
+            Intents.SYAI_APP                          ->
                 OneTimeWorkRequest.Builder(SyaiPlugin.SyaiWorker::class.java)
                     .setInputData(Data.Builder().also {
                         it.copyString("collection", bundle)
                         it.copyString("data", bundle)
                     }.build()).build()
 
-            Intents.SI_APP                          ->
+            Intents.SI_APP                            ->
                 OneTimeWorkRequest.Builder(PatchedSiAppPlugin.PatchedSiAppWorker::class.java)
                     .setInputData(Data.Builder().also {
                         it.copyString("collection", bundle)
                         it.copyString("data", bundle)
                     }.build()).build()
 
-            Intents.SINO_APP                        ->
+            Intents.SINO_APP                          ->
                 OneTimeWorkRequest.Builder(PatchedSinoAppPlugin.PatchedSinoAppWorker::class.java)
                     .setInputData(Data.Builder().also {
                         it.copyString("collection", bundle)
@@ -115,5 +120,4 @@ open class DataReceiver : DaggerBroadcastReceiver() {
         // Sometimes the schedule fail
         KeepAliveWorker.scheduleIfNotRunning(context, aapsLogger, fabricPrivacy)
     }
-
 }

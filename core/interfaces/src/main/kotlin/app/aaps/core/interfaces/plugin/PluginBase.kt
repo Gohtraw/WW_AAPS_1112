@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import org.jetbrains.annotations.TestOnly
 
 /**
  * Created by mike on 09.06.2016.
@@ -92,6 +93,31 @@ abstract class PluginBase(
                     onStateChange(type, state, State.DISABLED)
                     state = State.DISABLED
                     scope.launch { onStop() }
+                    aapsLogger.debug(LTag.CORE, "Stopping: $name")
+                }
+            }
+        }
+    }
+
+    /**
+     * Version of setPluginEnabled used for testing only.
+     * OnStart/OnStop is called directly.
+     */
+    @TestOnly
+    fun setPluginEnabledBlocking(type: PluginType, newState: Boolean) {
+        if (type == pluginDescription.mainType) {
+            if (newState) { // enabling plugin
+                if (state != State.ENABLED) {
+                    onStateChange(type, state, State.ENABLED)
+                    state = State.ENABLED
+                    aapsLogger.debug(LTag.CORE, "Starting: $name")
+                    onStart()
+                }
+            } else { // disabling plugin
+                if (state == State.ENABLED) {
+                    onStateChange(type, state, State.DISABLED)
+                    state = State.DISABLED
+                    onStop()
                     aapsLogger.debug(LTag.CORE, "Stopping: $name")
                 }
             }

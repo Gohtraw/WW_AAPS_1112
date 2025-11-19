@@ -418,6 +418,8 @@ interface DateUtil {
      * @return The formatted age string.
      */
     fun age(milliseconds: Long, useShortText: Boolean, rh: ResourceHelper): String
+    fun timeAgoFullString(milliseconds: Long, rh: ResourceHelper): String
+
 
     /**
      * Converts a duration in milliseconds into a simplified, human-readable string with the largest appropriate unit.

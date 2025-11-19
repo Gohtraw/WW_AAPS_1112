@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mock
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -69,8 +70,8 @@ class XdripSourceWorkerTest : TestBaseWithProfile() {
         runBlocking {
             whenever(xdripSourcePlugin.isEnabled()).thenReturn(true)
             whenever(preferences.get(BooleanKey.BgSourceCreateSensorChange)).thenReturn(true)
-            whenever(persistenceLayer.insertCgmSourceData(anyObject(), anyObject(), anyObject(), anyObject())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
-            val bundle = BundleMock.mock().apply {
+            whenever(persistenceLayer.insertCgmSourceData(anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+            val bundle = BundleMock.mocked().apply {
                 putString(Intents.XDRIP_DATA_SOURCE, "G6 Native")
                 putLong(Intents.EXTRA_TIMESTAMP, timestamp)
                 putLong(Intents.EXTRA_SENSOR_STARTED_AT, timestamp)
@@ -110,9 +111,9 @@ class XdripSourceWorkerTest : TestBaseWithProfile() {
     @Test
     fun `When glucoseValues are missing then return failure`() {
         runBlocking {
-            whenever(persistenceLayer.insertCgmSourceData(anyObject(), anyObject(), anyObject(), anyObject())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+            whenever(persistenceLayer.insertCgmSourceData(anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
             whenever(xdripSourcePlugin.isEnabled()).thenReturn(true)
-            val bundle = BundleMock.mock().apply {
+            val bundle = BundleMock.mocked().apply {
                 putString("sensorType", "G6")
             }
             whenever(dataWorkerStorage.pickupBundle(any())).thenReturn(bundle)

@@ -33,8 +33,8 @@ class GlunovoPluginTest : TestBaseWithProfile() {
     @BeforeEach
     fun setup() {
         whenever(context.contentResolver).thenReturn(contentResolver)
-        whenever(contentResolver.query(anyObject(), anyObject(), anyObject(), anyObject(), anyObject())).thenReturn(cursor)
-        whenever(persistenceLayer.insertCgmSourceData(anyObject(), anyObject(), anyObject(), anyObject())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+        whenever(contentResolver.query(anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull())).thenReturn(cursor)
+        whenever(persistenceLayer.insertCgmSourceData(anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
 
         glunovoPlugin = GlunovoPlugin(rh, aapsLogger, preferences, context, persistenceLayer, dateUtil, fabricPrivacy)
 
@@ -46,7 +46,7 @@ class GlunovoPluginTest : TestBaseWithProfile() {
     @Test
     fun `When plugin disabled then do nothing`() {
         // GIVEN
-        glunovoPlugin.setPluginEnabled(PluginType.BGSOURCE, false)
+        glunovoPlugin.setPluginEnabledBlocking(PluginType.BGSOURCE, false)
 
         // WHEN
         glunovoPlugin.handleNewData()
@@ -58,7 +58,7 @@ class GlunovoPluginTest : TestBaseWithProfile() {
     @Test
     fun `When new glucose and calibration data then insert it`() {
         // GIVEN
-        glunovoPlugin.setPluginEnabled(PluginType.BGSOURCE, true)
+        glunovoPlugin.setPluginEnabledBlocking(PluginType.BGSOURCE, true)
         val now = 1678886400000L
         whenever(dateUtil.now()).thenReturn(now)
         whenever(preferences.get(GlunovoLongKey.LastProcessedTimestamp)).thenReturn(0L)
@@ -95,7 +95,7 @@ class GlunovoPluginTest : TestBaseWithProfile() {
     @Test
     fun `When data is old then skip it`() {
         // GIVEN
-        glunovoPlugin.setPluginEnabled(PluginType.BGSOURCE, true)
+        glunovoPlugin.setPluginEnabledBlocking(PluginType.BGSOURCE, true)
         val now = 1678886400000L
         val lastProcessed = now - 2000
         whenever(dateUtil.now()).thenReturn(now)
@@ -117,7 +117,7 @@ class GlunovoPluginTest : TestBaseWithProfile() {
     @Test
     fun `When data is in future then skip it`() {
         // GIVEN
-        glunovoPlugin.setPluginEnabled(PluginType.BGSOURCE, true)
+        glunovoPlugin.setPluginEnabledBlocking(PluginType.BGSOURCE, true)
         val now = 1678886400000L
         whenever(dateUtil.now()).thenReturn(now)
         whenever(preferences.get(GlunovoLongKey.LastProcessedTimestamp)).thenReturn(0L)
@@ -138,7 +138,7 @@ class GlunovoPluginTest : TestBaseWithProfile() {
     @Test
     fun `When glucose value is out of bounds (low) then skip it`() {
         // GIVEN
-        glunovoPlugin.setPluginEnabled(PluginType.BGSOURCE, true)
+        glunovoPlugin.setPluginEnabledBlocking(PluginType.BGSOURCE, true)
         val now = 1678886400000L
         whenever(dateUtil.now()).thenReturn(now)
         whenever(preferences.get(GlunovoLongKey.LastProcessedTimestamp)).thenReturn(0L)
@@ -160,7 +160,7 @@ class GlunovoPluginTest : TestBaseWithProfile() {
     @Test
     fun `When glucose value is out of bounds (high) then skip it`() {
         // GIVEN
-        glunovoPlugin.setPluginEnabled(PluginType.BGSOURCE, true)
+        glunovoPlugin.setPluginEnabledBlocking(PluginType.BGSOURCE, true)
         val now = 1678886400000L
         whenever(dateUtil.now()).thenReturn(now)
         whenever(preferences.get(GlunovoLongKey.LastProcessedTimestamp)).thenReturn(0L)
@@ -182,7 +182,7 @@ class GlunovoPluginTest : TestBaseWithProfile() {
     @Test
     fun `When content resolver throws SecurityException then log error`() {
         // GIVEN
-        glunovoPlugin.setPluginEnabled(PluginType.BGSOURCE, true)
+        glunovoPlugin.setPluginEnabledBlocking(PluginType.BGSOURCE, true)
         val exception = SecurityException("Permission denied")
         whenever(contentResolver.query(any(), any(), any(), any(), any())).thenThrow(exception)
 
@@ -196,7 +196,7 @@ class GlunovoPluginTest : TestBaseWithProfile() {
     @Test
     fun `When content resolver query returns null then do nothing`() {
         // GIVEN
-        glunovoPlugin.setPluginEnabled(PluginType.BGSOURCE, true)
+        glunovoPlugin.setPluginEnabledBlocking(PluginType.BGSOURCE, true)
         whenever(contentResolver.query(any(), any(), any(), any(), any())).thenReturn(null)
 
         // WHEN

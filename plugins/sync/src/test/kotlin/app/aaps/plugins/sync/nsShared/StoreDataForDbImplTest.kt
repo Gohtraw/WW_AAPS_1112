@@ -33,6 +33,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyList
 import org.mockito.Mock
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.argThat
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
@@ -76,7 +77,7 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
     @BeforeEach
     fun setUp() {
         // Mock the persistence layer to return empty results immediately
-        whenever(persistenceLayer.insertCgmSourceData(any(), any(), any(), anyObject()))
+        whenever(persistenceLayer.insertCgmSourceData(any(), any(), any(), anyOrNull()))
             .thenReturn(
                 Single.just(
                     PersistenceLayer.TransactionResult<GV>().apply {
@@ -144,7 +145,7 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
             .thenReturn(Single.just(PersistenceLayer.TransactionResult()))
         whenever(persistenceLayer.updateRunningModesNsIds(any()))
             .thenReturn(Single.just(PersistenceLayer.TransactionResult()))
-        whenever(persistenceLayer.invalidateGlucoseValue(any(), any(), any(), anyObject(), anyList()))
+        whenever(persistenceLayer.invalidateGlucoseValue(any(), any(), any(), anyOrNull(), anyList()))
             .thenReturn(Single.just(PersistenceLayer.TransactionResult()))
 
         storeDataForDb = StoreDataForDbImpl(
@@ -387,10 +388,10 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         whenever(preferences.get(BooleanKey.NsClientAcceptInsulin)).thenReturn(true)
         whenever(persistenceLayer.getBolusByNSId(nsId)).thenReturn(bs)
-        whenever(persistenceLayer.invalidateBolus(any(), any(), any(), anyObject(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+        whenever(persistenceLayer.invalidateBolus(any(), any(), any(), anyOrNull(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
         storeDataForDb.updateDeletedTreatmentsInDb()
         verify(persistenceLayer).getBolusByNSId(nsId)
-        verify(persistenceLayer).invalidateBolus(eq(bs.id), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer).invalidateBolus(eq(bs.id), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -402,7 +403,7 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
         whenever(config.AAPSCLIENT).thenReturn(false) // Ensure AAPSCLIENT is also false
         storeDataForDb.updateDeletedTreatmentsInDb()
         verify(persistenceLayer, never()).getBolusByNSId(any())
-        verify(persistenceLayer, never()).invalidateBolus(any(), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer, never()).invalidateBolus(any(), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -412,10 +413,10 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         whenever(preferences.get(BooleanKey.NsClientAcceptCarbs)).thenReturn(true)
         whenever(persistenceLayer.getCarbsByNSId(nsId)).thenReturn(ca)
-        whenever(persistenceLayer.invalidateCarbs(any(), any(), any(), anyObject(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+        whenever(persistenceLayer.invalidateCarbs(any(), any(), any(), anyOrNull(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
         storeDataForDb.updateDeletedTreatmentsInDb()
         verify(persistenceLayer).getCarbsByNSId(nsId)
-        verify(persistenceLayer).invalidateCarbs(eq(ca.id), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer).invalidateCarbs(eq(ca.id), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -432,7 +433,7 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         // Assert
         verify(persistenceLayer, never()).getCarbsByNSId(any())
-        verify(persistenceLayer, never()).invalidateCarbs(any(), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer, never()).invalidateCarbs(any(), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -443,14 +444,14 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         whenever(preferences.get(BooleanKey.NsClientAcceptTempTarget)).thenReturn(true)
         whenever(persistenceLayer.getTemporaryTargetByNSId(nsId)).thenReturn(tt)
-        whenever(persistenceLayer.invalidateTemporaryTarget(any(), any(), any(), anyObject(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+        whenever(persistenceLayer.invalidateTemporaryTarget(any(), any(), any(), anyOrNull(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
 
         // Act
         storeDataForDb.updateDeletedTreatmentsInDb()
 
         // Assert
         verify(persistenceLayer).getTemporaryTargetByNSId(nsId)
-        verify(persistenceLayer).invalidateTemporaryTarget(eq(tt.id), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer).invalidateTemporaryTarget(eq(tt.id), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -466,7 +467,7 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         // Assert
         verify(persistenceLayer, never()).getTemporaryTargetByNSId(any())
-        verify(persistenceLayer, never()).invalidateTemporaryTarget(any(), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer, never()).invalidateTemporaryTarget(any(), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -478,14 +479,14 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         // Set preferences to false to prove they are ignored for BCR
         whenever(persistenceLayer.getBolusCalculatorResultByNSId(nsId)).thenReturn(bcrToDelete)
-        whenever(persistenceLayer.invalidateBolusCalculatorResult(any(), any(), any(), anyObject(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+        whenever(persistenceLayer.invalidateBolusCalculatorResult(any(), any(), any(), anyOrNull(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
 
         // Act
         storeDataForDb.updateDeletedTreatmentsInDb()
 
         // Assert
         verify(persistenceLayer).getBolusCalculatorResultByNSId(nsId)
-        verify(persistenceLayer).invalidateBolusCalculatorResult(eq(bcrToDelete.id), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer).invalidateBolusCalculatorResult(eq(bcrToDelete.id), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -496,14 +497,14 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         whenever(preferences.get(BooleanKey.NsClientAcceptTbrEb)).thenReturn(true)
         whenever(persistenceLayer.getTemporaryBasalByNSId(nsId)).thenReturn(tb)
-        whenever(persistenceLayer.invalidateTemporaryBasal(any(), any(), any(), anyObject(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+        whenever(persistenceLayer.invalidateTemporaryBasal(any(), any(), any(), anyOrNull(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
 
         // Act
         storeDataForDb.updateDeletedTreatmentsInDb()
 
         // Assert
         verify(persistenceLayer).getTemporaryBasalByNSId(nsId)
-        verify(persistenceLayer).invalidateTemporaryBasal(eq(tb.id), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer).invalidateTemporaryBasal(eq(tb.id), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -520,7 +521,7 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         // Assert
         verify(persistenceLayer, never()).getTemporaryBasalByNSId(any())
-        verify(persistenceLayer, never()).invalidateTemporaryBasal(any(), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer, never()).invalidateTemporaryBasal(any(), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -531,14 +532,14 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         whenever(preferences.get(BooleanKey.NsClientAcceptTbrEb)).thenReturn(true)
         whenever(persistenceLayer.getExtendedBolusByNSId(nsId)).thenReturn(eb)
-        whenever(persistenceLayer.invalidateExtendedBolus(any(), any(), any(), anyObject(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+        whenever(persistenceLayer.invalidateExtendedBolus(any(), any(), any(), anyOrNull(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
 
         // Act
         storeDataForDb.updateDeletedTreatmentsInDb()
 
         // Assert
         verify(persistenceLayer).getExtendedBolusByNSId(nsId)
-        verify(persistenceLayer).invalidateExtendedBolus(eq(eb.id), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer).invalidateExtendedBolus(eq(eb.id), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -555,7 +556,7 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         // Assert
         verify(persistenceLayer, never()).getExtendedBolusByNSId(any())
-        verify(persistenceLayer, never()).invalidateExtendedBolus(any(), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer, never()).invalidateExtendedBolus(any(), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -566,14 +567,14 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         whenever(preferences.get(BooleanKey.NsClientAcceptProfileSwitch)).thenReturn(true)
         whenever(persistenceLayer.getProfileSwitchByNSId(nsId)).thenReturn(ps)
-        whenever(persistenceLayer.invalidateProfileSwitch(any(), any(), any(), anyObject(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+        whenever(persistenceLayer.invalidateProfileSwitch(any(), any(), any(), anyOrNull(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
 
         // Act
         storeDataForDb.updateDeletedTreatmentsInDb()
 
         // Assert
         verify(persistenceLayer).getProfileSwitchByNSId(nsId)
-        verify(persistenceLayer).invalidateProfileSwitch(eq(ps.id), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer).invalidateProfileSwitch(eq(ps.id), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -590,7 +591,7 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         // Assert
         verify(persistenceLayer, never()).getProfileSwitchByNSId(any())
-        verify(persistenceLayer, never()).invalidateProfileSwitch(any(), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer, never()).invalidateProfileSwitch(any(), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -601,14 +602,14 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         whenever(preferences.get(BooleanKey.NsClientAcceptProfileSwitch)).thenReturn(true)
         whenever(persistenceLayer.getEffectiveProfileSwitchByNSId(nsId)).thenReturn(eps)
-        whenever(persistenceLayer.invalidateEffectiveProfileSwitch(any(), any(), any(), anyObject(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+        whenever(persistenceLayer.invalidateEffectiveProfileSwitch(any(), any(), any(), anyOrNull(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
 
         // Act
         storeDataForDb.updateDeletedTreatmentsInDb()
 
         // Assert
         verify(persistenceLayer).getEffectiveProfileSwitchByNSId(nsId)
-        verify(persistenceLayer).invalidateEffectiveProfileSwitch(eq(eps.id), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer).invalidateEffectiveProfileSwitch(eq(eps.id), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -625,7 +626,7 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         // Assert
         verify(persistenceLayer, never()).getEffectiveProfileSwitchByNSId(any())
-        verify(persistenceLayer, never()).invalidateEffectiveProfileSwitch(any(), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer, never()).invalidateEffectiveProfileSwitch(any(), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -637,14 +638,14 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
         whenever(preferences.get(BooleanKey.NsClientAcceptRunningMode)).thenReturn(true)
         whenever(config.isEngineeringMode()).thenReturn(true) // Both conditions must be met
         whenever(persistenceLayer.getRunningModeByNSId(nsId)).thenReturn(rm)
-        whenever(persistenceLayer.invalidateRunningMode(any(), any(), any(), anyObject(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+        whenever(persistenceLayer.invalidateRunningMode(any(), any(), any(), anyOrNull(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
 
         // Act
         storeDataForDb.updateDeletedTreatmentsInDb()
 
         // Assert
         verify(persistenceLayer).getRunningModeByNSId(nsId)
-        verify(persistenceLayer).invalidateRunningMode(eq(rm.id), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer).invalidateRunningMode(eq(rm.id), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -661,7 +662,7 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         // Assert
         verify(persistenceLayer, never()).getRunningModeByNSId(any())
-        verify(persistenceLayer, never()).invalidateRunningMode(any(), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer, never()).invalidateRunningMode(any(), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -672,14 +673,14 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         whenever(preferences.get(BooleanKey.NsClientAcceptTherapyEvent)).thenReturn(true)
         whenever(persistenceLayer.getTherapyEventByNSId(nsId)).thenReturn(te)
-        whenever(persistenceLayer.invalidateTherapyEvent(any(), any(), any(), anyObject(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+        whenever(persistenceLayer.invalidateTherapyEvent(any(), any(), any(), anyOrNull(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
 
         // Act
         storeDataForDb.updateDeletedTreatmentsInDb()
 
         // Assert
         verify(persistenceLayer).getTherapyEventByNSId(nsId)
-        verify(persistenceLayer).invalidateTherapyEvent(eq(te.id), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer).invalidateTherapyEvent(eq(te.id), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -695,7 +696,7 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
 
         // Assert
         verify(persistenceLayer, never()).getTherapyEventByNSId(any())
-        verify(persistenceLayer, never()).invalidateTherapyEvent(any(), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer, never()).invalidateTherapyEvent(any(), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -708,7 +709,7 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
         // Verify that we tried to find the GV by its Nightscout ID
         verify(persistenceLayer).getBgReadingByNSId(nsIdToDelete)
         // Verify that the invalidate method was called with the correct local ID
-        verify(persistenceLayer).invalidateGlucoseValue(eq(gv.id), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer).invalidateGlucoseValue(eq(gv.id), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -722,7 +723,7 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
         // Verify that we tried to find the GV
         verify(persistenceLayer).getBgReadingByNSId(nsIdNotFound)
         // Crucially, verify that the invalidate method was NEVER called
-        verify(persistenceLayer, never()).invalidateGlucoseValue(any(), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer, never()).invalidateGlucoseValue(any(), any(), any(), anyOrNull(), anyList())
     }
 
     @Test
@@ -737,14 +738,14 @@ class StoreDataForDbImplTest : TestBaseWithProfile() {
         whenever(preferences.get(BooleanKey.NsClientAcceptCarbs)).thenReturn(true)
 
         whenever(persistenceLayer.getBolusByNSId(bolusId)).thenReturn(bs)
-        whenever(persistenceLayer.invalidateBolus(any(), any(), any(), anyObject(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+        whenever(persistenceLayer.invalidateBolus(any(), any(), any(), anyOrNull(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
         whenever(persistenceLayer.getCarbsByNSId(carbId)).thenReturn(ca)
-        whenever(persistenceLayer.invalidateCarbs(any(), any(), any(), anyObject(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+        whenever(persistenceLayer.invalidateCarbs(any(), any(), any(), anyOrNull(), anyList())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
         storeDataForDb.updateDeletedTreatmentsInDb()
         verify(persistenceLayer).getBolusByNSId(bolusId)
-        verify(persistenceLayer).invalidateBolus(eq(bs.id), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer).invalidateBolus(eq(bs.id), any(), any(), anyOrNull(), anyList())
         verify(persistenceLayer).getCarbsByNSId(carbId)
-        verify(persistenceLayer).invalidateCarbs(eq(ca.id), any(), any(), anyObject(), anyList())
+        verify(persistenceLayer).invalidateCarbs(eq(ca.id), any(), any(), anyOrNull(), anyList())
         assertTrue(storeDataForDb.deleteTreatment.isEmpty())
     }
 

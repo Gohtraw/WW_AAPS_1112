@@ -347,6 +347,32 @@ class DateUtilImpl @Inject constructor(
         }
     }
 
+    override fun timeAgoFullString(milliseconds: Long, rh: ResourceHelper): String {
+        if (milliseconds > 0) {
+            // Show patch start time and age
+            val daysAgo = T.msecs(milliseconds).days()
+            val hoursAgo = T.msecs(milliseconds).hours() % 24
+            val minutesAgo = T.msecs(milliseconds).mins() % 60
+
+            val agoString = if (daysAgo > 0)
+                // Show multiple day(s) and hours ago
+                rh.gq(R.plurals.plurals_day_hour_ago, daysAgo.toInt(), daysAgo.toString(), hoursAgo.toString())
+            else if (hoursAgo > 0)
+                // Only show single hour(s) ago
+                rh.gq(R.plurals.plurals_hour_ago, hoursAgo.toInt(), hoursAgo.toString())
+            else if (minutesAgo > 0)
+                // Only show minute(s) ago
+                rh.gq(R.plurals.plurals_minute_ago, minutesAgo.toInt(), minutesAgo.toString())
+            else
+                // Show other
+                rh.gs(R.string.seconds_ago)
+
+            return agoString
+        }
+        else
+            return ""
+    }
+
     override fun age(milliseconds: Long, useShortText: Boolean, rh: ResourceHelper): String {
         val duration = milliseconds.milliseconds
         if (duration.inWholeDays > 1000) return rh.gs(R.string.forever)

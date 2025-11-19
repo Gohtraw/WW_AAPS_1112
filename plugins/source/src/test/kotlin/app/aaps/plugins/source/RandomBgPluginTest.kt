@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mock
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
@@ -27,13 +28,14 @@ class RandomBgPluginTest : TestBaseWithProfile() {
 
     @Test
     fun `When plugin enabled then insert data`() {
-        whenever(persistenceLayer.insertCgmSourceData(anyObject(), anyObject(), anyObject(), anyObject())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+        whenever(persistenceLayer.insertCgmSourceData(anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
+        whenever(persistenceLayer.insertOrUpdateCarbs(anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull())).thenReturn(Single.just(PersistenceLayer.TransactionResult()))
         whenever(config.isUnfinishedMode()).thenReturn(true)
         whenever(preferences.get(IntKey.BgSourceRandomInterval)).thenReturn(5)
         randomBgPlugin.setPluginEnabled(PluginType.BGSOURCE, true)
         randomBgPlugin.handleNewData()
 
-        verify(persistenceLayer).insertCgmSourceData(anyObject(), anyObject(), anyObject(), anyObject())
+        verify(persistenceLayer).insertCgmSourceData(anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull())
     }
 
     @Test
