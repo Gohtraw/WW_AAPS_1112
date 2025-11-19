@@ -146,13 +146,13 @@ class EditQuickWizardDialog : DaggerDialogFragment(), View.OnClickListener {
                 .build()
             timePicker.addOnPositiveButtonClickListener {
                 fromSeconds = (T.hours(timePicker.hour.toLong()).secs() + T.mins(timePicker.minute.toLong()).secs()).toInt()
-                binding.from.text = dateUtil.timeString(dateUtil.secondsOfTheDayToMilliseconds(fromSeconds))
+                binding.from.text = dateUtil.timeString(dateUtil.minutesOfTheDayToMilliseconds(fromSeconds))
             }
             timePicker.show(parentFragmentManager, "event_time_time_picker")
         }
 
         fromSeconds = entry.validFrom()
-        binding.from.text = dateUtil.timeString(dateUtil.secondsOfTheDayToMilliseconds(fromSeconds))
+        binding.from.text = dateUtil.timeString(dateUtil.minutesOfTheDayToMilliseconds(fromSeconds))
 
         binding.to.setOnClickListener {
             val clockFormat = if (DateFormat.is24HourFormat(context)) TimeFormat.CLOCK_24H else TimeFormat.CLOCK_12H
@@ -163,7 +163,7 @@ class EditQuickWizardDialog : DaggerDialogFragment(), View.OnClickListener {
                 .build()
             timePicker.addOnPositiveButtonClickListener {
                 toSeconds = (T.hours(timePicker.hour.toLong()).secs() + T.mins(timePicker.minute.toLong()).secs()).toInt()
-                binding.to.text = dateUtil.timeString(dateUtil.secondsOfTheDayToMilliseconds(toSeconds))
+                binding.to.text = dateUtil.timeString(dateUtil.minutesOfTheDayToMilliseconds(toSeconds))
             }
             timePicker.show(parentFragmentManager, "event_time_time_picker")
         }
@@ -233,7 +233,7 @@ class EditQuickWizardDialog : DaggerDialogFragment(), View.OnClickListener {
         binding.correctionInput.value = entry.percentage().toDouble()
 
         toSeconds = entry.validTo()
-        binding.to.text = dateUtil.timeString(dateUtil.secondsOfTheDayToMilliseconds(toSeconds))
+        binding.to.text = dateUtil.timeString(dateUtil.minutesOfTheDayToMilliseconds(toSeconds))
 
         binding.buttonEdit.setText(entry.buttonText())
         when (entry.device()) {

@@ -181,9 +181,9 @@ class QuickWizardEntry @Inject constructor(
 
     fun carbs(): Int = safeGetInt(storage, "carbs")
 
-    fun validFromDate(): Long = dateUtil.secondsOfTheDayToMilliseconds(validFrom())
+    fun validFromDate(): Long = dateUtil.minutesOfTheDayToMilliseconds(validFrom())
 
-    fun validToDate(): Long = dateUtil.secondsOfTheDayToMilliseconds(validTo())
+    fun validToDate(): Long = dateUtil.minutesOfTheDayToMilliseconds(validTo())
 
     fun validFrom(): Int = safeGetInt(storage, "validFrom")
 
